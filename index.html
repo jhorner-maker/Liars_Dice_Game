@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0604">
 <title>Liar's Dice — Dead Man's Chest</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -525,6 +529,340 @@
     box-shadow: 0 0 30px rgba(255,200,80,0.5);
   }
   .go-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  /*=================================================================
+    MOBILE PORTRAIT VIEW — full HTML UI replacing the canvas+HUD
+    Activated only on portrait phones via @media query at the bottom.
+  =================================================================*/
+  #mobile-view { display: none; }
+
+  /* Atmospheric pirate-cabin background, layered over the whole mobile view. */
+  body.in-game #mobile-view {
+    background:
+      radial-gradient(ellipse at top, rgba(255,140,40,0.08), transparent 60%),
+      linear-gradient(to bottom, #1a0e04 0%, #0a0604 40%, #0a0604 100%),
+      repeating-linear-gradient(0deg, #1a1004 0 4px, #0a0602 4px 8px);
+    /* Honor iOS notch / home indicator. viewport-fit=cover (in <meta>) lets us extend behind them. */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mob-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    /* Extend up past the notch with safe-area padding so content sits under it. */
+    padding-top: calc(10px + env(safe-area-inset-top));
+    background:
+      linear-gradient(to bottom, #3a2410, #1a1004),
+      repeating-linear-gradient(90deg, #2a1808 0 6px, #1a1004 6px 12px);
+    border-bottom: 3px solid #6a4020;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    position: sticky; top: 0; z-index: 5;
+  }
+  /* Hide the lobby-only "code" line when actively in game. */
+  body.in-game #mob-code { display: none; }
+  .mob-round-info {
+    font-size: 8px; color: #8a6840; letter-spacing: 3px;
+    margin-top: 3px;
+  }
+  body:not(.in-game) .mob-round-info { display: none; }
+  .mob-icon-btn {
+    font-family: 'Press Start 2P', monospace;
+    background: #1a1004; color: #f4d27a;
+    border: 2px solid #4a3010;
+    width: 44px; height: 44px;
+    cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.1s;
+  }
+  .mob-icon-btn:active {
+    transform: scale(0.94);
+    background: #2a1808;
+    border-color: #6a4020;
+  }
+  .mob-title-block {
+    flex: 1; text-align: center;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .mob-title { font-size: 11px; color: #f4d27a; letter-spacing: 2px; }
+  .mob-code { font-size: 9px; color: #8a6840; letter-spacing: 3px; }
+  .mob-status {
+    padding: 12px 14px;
+    background: rgba(20,10,4,0.92);
+    border-bottom: 2px solid #4a3010;
+    text-align: center;
+    font-size: 11px;
+    color: #f4d27a;
+    line-height: 1.4;
+  }
+  .mob-bid-display {
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px;
+    padding: 14px;
+    background: linear-gradient(to bottom, #1a1004, #2a1808);
+    border-bottom: 2px solid #6a4020;
+  }
+  .mob-bid-empty {
+    font-size: 10px; color: #c89860; letter-spacing: 2px;
+  }
+  .mob-bid-qty {
+    font-size: 28px; color: #f4d27a;
+    text-shadow: 2px 2px 0 #6a2010;
+  }
+  .mob-bid-x { font-size: 14px; color: #c89860; }
+  .mob-bid-die {
+    width: 44px; height: 44px;
+    image-rendering: pixelated;
+    background: #fff0c8; border: 2px solid #1a0a04;
+  }
+  .mob-bid-by {
+    font-size: 8px; color: #8a6840; letter-spacing: 1px;
+    margin-top: 2px;
+  }
+  .mob-players {
+    display: flex; flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+  }
+  .mob-player-row {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(26,16,4,0.85);
+    border: 2px solid #4a3010;
+    padding: 5px 8px;
+    transition: all 0.15s;
+    min-height: 44px;
+  }
+  .mob-player-row.current {
+    border-color: #f4d27a;
+    background: linear-gradient(to right, rgba(106,32,16,0.5), rgba(106,32,16,0.25));
+    animation: mobPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes mobPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(244,210,122,0.25); }
+    50%      { box-shadow: 0 0 18px rgba(244,210,122,0.6); }
+  }
+  .mob-player-row.you { border-left-width: 5px; border-left-color: #f4d27a; }
+  .mob-player-row.you .mob-player-name::after {
+    content: ' (YOU)';
+    color: #f4d27a;
+    font-size: 8px;
+    margin-left: 4px;
+  }
+  .mob-player-row.dead { opacity: 0.32; filter: grayscale(80%); }
+  .mob-player-row.dead .mob-player-name { text-decoration: line-through; }
+  .mob-player-row canvas {
+    width: 32px; height: 32px;
+    image-rendering: pixelated;
+    background: #0a0604; border: 1px solid #1a0a04;
+    flex-shrink: 0;
+  }
+  .mob-player-meta { line-height: 1.2; }
+  .mob-player-name { font-size: 10px; color: #f4d27a; }
+  .mob-player-tag { font-size: 7px; color: #8a6840; margin-top: 2px; }
+  .mob-player-meta { flex: 1; min-width: 0; }
+  .mob-player-name { font-size: 11px; color: #f4d27a; }
+  .mob-player-tag { font-size: 8px; color: #8a6840; margin-top: 3px; }
+  .mob-player-dice {
+    display: flex; gap: 3px;
+    align-items: center;
+  }
+  .mob-dice-dot {
+    width: 8px; height: 8px;
+    background: #c89860;
+    border-radius: 1px;
+  }
+  .mob-dice-dot.empty { background: #2a1808; }
+  .mob-player-row.current .mob-dice-dot { background: #f4d27a; }
+  .mob-player-status {
+    font-size: 7px; color: #80c040;
+    border: 1px solid #80c040;
+    padding: 3px 6px;
+  }
+  .mob-player-status.turn { color: #f4d27a; border-color: #f4d27a; }
+  .mob-player-status.dead { color: #f04040; border-color: #f04040; }
+  .mob-hand-section {
+    background: linear-gradient(to bottom, #2a1808, #1a1004);
+    border-top: 2px solid #6a4020;
+    border-bottom: 2px solid #6a4020;
+    padding: 12px 14px;
+    text-align: center;
+  }
+  .mob-hand-label {
+    font-size: 9px; color: #f4d27a;
+    letter-spacing: 2px; margin-bottom: 8px;
+  }
+  .mob-hand-dice {
+    display: flex; gap: 8px; justify-content: center;
+  }
+  .mob-hand-dice canvas {
+    width: 48px; height: 48px;
+    image-rendering: pixelated;
+    background: #fff0c8; border: 2px solid #1a0a04;
+  }
+  .mob-controls {
+    padding: 14px;
+    background: linear-gradient(to bottom, #1a1004, #0a0602);
+    border-top: 2px solid #6a4020;
+  }
+  .mob-bid-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .mob-bid-row .mob-stepper {
+    display: flex; align-items: center; gap: 4px;
+    background: #2a1808; border: 2px solid #4a3010;
+    padding: 4px;
+  }
+  .mob-bid-row .mob-stepper button {
+    width: 40px; height: 40px;
+    font-family: 'Press Start 2P', monospace;
+    background: #4a3010; color: #f4d27a; border: none;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.08s;
+  }
+  .mob-bid-row .mob-stepper button:hover { background: #6a4020; }
+  .mob-bid-row .mob-stepper button:active {
+    background: #8a5028; transform: scale(0.92);
+  }
+  .mob-bid-row .mob-stepper-value {
+    min-width: 40px; text-align: center;
+    font-size: 18px; color: #f4d27a;
+  }
+  .mob-bid-row .mob-stepper canvas {
+    width: 36px; height: 36px;
+    image-rendering: pixelated;
+  }
+  .mob-bid-x-label { font-size: 14px; color: #c89860; }
+  .mob-bid-label { font-size: 11px; color: #c89860; letter-spacing: 2px; margin-right: 4px; }
+  .mob-action-row {
+    display: flex; gap: 12px;
+  }
+  .mob-action-row button {
+    flex: 1;
+    font-family: 'Press Start 2P', monospace;
+    padding: 16px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 3px solid;
+    min-height: 56px;
+    text-shadow: 2px 2px 0 #2a0808;
+    letter-spacing: 1px;
+    transition: all 0.1s;
+  }
+  .mob-action-row button:active:not(:disabled) {
+    transform: scale(0.96) translateY(1px);
+  }
+  .mob-action-row .mob-bid-btn {
+    background: #2a4a10; color: #f4d27a; border-color: #80c040;
+  }
+  .mob-action-row .mob-bid-btn:hover:not(:disabled) { background: #3a6a18; }
+  .mob-action-row .mob-bid-btn:active:not(:disabled) { background: #4a8020; box-shadow: 0 0 14px rgba(128,192,64,0.6); }
+  .mob-action-row .mob-bid-btn:disabled { background: #1a1004; color: #6a5030; border-color: #4a3010; opacity: 0.5; cursor: not-allowed; }
+  .mob-action-row .mob-bid-btn:not(:disabled) {
+    box-shadow: 0 0 8px rgba(128,192,64,0.3);
+    animation: mobBtnGlow 1.8s ease-in-out infinite;
+  }
+  @keyframes mobBtnGlow {
+    0%, 100% { box-shadow: 0 0 6px rgba(128,192,64,0.25); }
+    50%      { box-shadow: 0 0 16px rgba(128,192,64,0.55); }
+  }
+  .mob-action-row .mob-liar-btn {
+    background: #6a1010; color: #f4d27a; border-color: #f04040;
+  }
+  .mob-action-row .mob-liar-btn:hover:not(:disabled) { background: #8a2020; }
+  .mob-action-row .mob-liar-btn:active:not(:disabled) { background: #c02020; box-shadow: 0 0 14px rgba(240,64,64,0.6); }
+  .mob-action-row .mob-liar-btn:disabled { background: #1a1004; color: #6a5030; border-color: #4a3010; opacity: 0.5; cursor: not-allowed; }
+  /* Waiting-turn message — replaces the action row when it's not your turn */
+  .mob-waiting-msg {
+    text-align: center;
+    padding: 18px 12px;
+    color: #c89860;
+    font-size: 11px;
+    letter-spacing: 2px;
+    background: rgba(26,16,4,0.6);
+    border: 2px dashed #4a3010;
+    line-height: 1.6;
+  }
+  .mob-waiting-msg .who { color: #f4d27a; font-size: 13px; }
+  /* Hand-dice roll-in animation */
+  .mob-hand-dice canvas { animation: mobDieIn 0.4s ease-out backwards; }
+  .mob-hand-dice canvas:nth-child(1) { animation-delay: 0.0s; }
+  .mob-hand-dice canvas:nth-child(2) { animation-delay: 0.06s; }
+  .mob-hand-dice canvas:nth-child(3) { animation-delay: 0.12s; }
+  .mob-hand-dice canvas:nth-child(4) { animation-delay: 0.18s; }
+  .mob-hand-dice canvas:nth-child(5) { animation-delay: 0.24s; }
+  @keyframes mobDieIn {
+    0% { opacity: 0; transform: translateY(-10px) scale(0.85); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  /* Reveal-phase per-player dice readout */
+  .mob-reveal-dice {
+    display: flex; gap: 4px; margin-top: 6px;
+    flex-wrap: wrap; justify-content: flex-end;
+  }
+  .mob-reveal-dice canvas {
+    width: 22px; height: 22px;
+    image-rendering: pixelated;
+    background: #fff0c8; border: 1px solid #1a0a04;
+  }
+  .mob-reveal-dice canvas.match {
+    border-color: #80c040;
+    box-shadow: 0 0 6px rgba(128,192,64,0.6);
+  }
+  .mob-log-toggle {
+    width: 100%;
+    background: #1a1004; color: #c89860;
+    border: 2px solid #4a3010;
+    padding: 10px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    margin-top: 12px;
+  }
+  .mob-log-panel {
+    background: rgba(10,6,2,0.92);
+    border: 2px solid #4a3010;
+    border-top: none;
+    padding: 10px;
+    font-size: 8px;
+    line-height: 1.6;
+    color: #c89860;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  .mob-log-panel.hidden { display: none; }
+  .mob-log-panel .log-entry { margin-bottom: 4px; }
+  .mob-log-panel .log-entry.bid { color: #d8b878; }
+  .mob-log-panel .log-entry.liar { color: #f48030; }
+  .mob-log-panel .log-entry.win { color: #80f080; }
+  .mob-log-panel .log-entry.eliminate { color: #f04040; }
+
+  @media (max-width: 800px) and (orientation: portrait), (max-width: 500px) {
+    /* Hide the desktop canvas + HUD entirely on portrait phones */
+    #app { display: none !important; }
+    #hud { display: none !important; }
+    /* Show the mobile UI when in-game on portrait */
+    body.in-game #mobile-view { display: flex; flex-direction: column; min-height: 100vh; background: #0a0604; }
+    /* Lobby + title + menu still work — they're already mostly HTML — but tighten them. */
+    #title-screen h1 { font-size: clamp(36px, 12vw, 56px); }
+    #title-screen .title-stack { padding: 6vh 6vw; }
+    .title-online-row { flex-direction: column; gap: 8px; align-items: stretch; }
+    .title-online-row .btn { padding: 1em 1.4em; min-height: 52px; }
+    #title-screen .btn-new { padding: 1.2em 2em; min-height: 60px; font-size: clamp(16px, 4.5vw, 22px); }
+    #online-lobby, #online-join { padding: 4vh 4vw; align-items: stretch; }
+    .lobby-stack { width: 100%; gap: 1.2em; }
+    .lobby-actions { flex-direction: column; }
+    .lobby-actions .btn { width: 100%; min-height: 52px; }
+    .lobby-input { width: 100%; box-sizing: border-box; min-height: 52px; }
+    .ai-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; max-width: 100%; }
+    .ai-card { padding: 8px; }
+    .ai-card canvas { width: 64px; height: 64px; }
+    #menu { padding: 4vh 4vw; }
+    .player-input { width: 100%; box-sizing: border-box; min-height: 52px; font-size: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -623,6 +961,52 @@
     <div class="orient-icon">⟳</div>
     <div class="orient-title">ROTATE YOUR PHONE</div>
     <div class="orient-text">Hold yer phone sideways to play, matey.</div>
+  </div>
+</div>
+
+<!-- ========================================================
+  MOBILE PORTRAIT IN-GAME VIEW (HTML-based, replaces canvas)
+  ======================================================== -->
+<div id="mobile-view">
+  <div class="mob-header">
+    <button class="mob-icon-btn" id="mob-leave-btn" title="Leave game">⟵</button>
+    <div class="mob-title-block">
+      <div class="mob-title">LIAR'S DICE</div>
+      <div class="mob-code" id="mob-code"></div>
+      <div class="mob-round-info" id="mob-round-info"></div>
+    </div>
+    <button class="mob-icon-btn" id="mob-audio-btn" title="Toggle music">♪</button>
+  </div>
+  <div class="mob-status" id="mob-status">Awaiting bid...</div>
+  <div class="mob-bid-display" id="mob-bid-display">
+    <span class="mob-bid-empty">— No bid yet —</span>
+  </div>
+  <div class="mob-players" id="mob-players-list"></div>
+  <div class="mob-hand-section">
+    <div class="mob-hand-label" id="mob-hand-label">YER HAND</div>
+    <div class="mob-hand-dice" id="mob-hand-dice-list"></div>
+  </div>
+  <div class="mob-controls">
+    <div class="mob-bid-row">
+      <span class="mob-bid-label">BID:</span>
+      <div class="mob-stepper">
+        <button id="mob-qty-down">-</button>
+        <span class="mob-stepper-value" id="mob-qty-val">1</span>
+        <button id="mob-qty-up">+</button>
+      </div>
+      <span class="mob-bid-x-label">×</span>
+      <div class="mob-stepper">
+        <button id="mob-face-down">-</button>
+        <canvas id="mob-face-icon" width="12" height="12"></canvas>
+        <button id="mob-face-up">+</button>
+      </div>
+    </div>
+    <div class="mob-action-row">
+      <button class="mob-bid-btn" id="mob-bid-btn">RAISE BID</button>
+      <button class="mob-liar-btn" id="mob-liar-btn">CALL LIAR!</button>
+    </div>
+    <button class="mob-log-toggle" id="mob-log-toggle">▼ SHIP'S LOG</button>
+    <div class="mob-log-panel hidden" id="mob-log-panel"></div>
   </div>
 </div>
 <div id="menu" class="hidden">
@@ -5018,6 +5402,414 @@ document.getElementById('btn-copy-code').onclick = async () => {
     setTimeout(() => clientJoin(code), 50);
   }
 })();
+
+//=================================================================
+// MOBILE PORTRAIT IN-GAME UI
+// HTML-based UI that takes over from the canvas+HUD when in portrait
+// on a phone-sized screen. Mirrors state via update calls hooked into
+// the existing updateBanner / updateControls / renderLog functions.
+//=================================================================
+const MOBILE = (() => {
+  const mql = window.matchMedia('(max-width: 800px) and (orientation: portrait), (max-width: 500px)');
+  function isMobilePortrait() { return mql.matches; }
+
+  function setInGame(yes) {
+    document.body.classList.toggle('in-game', !!yes);
+  }
+
+  let lastTurnSig = null;
+  function renderAll() {
+    if (!isMobilePortrait()) return;
+    renderHeader();
+    renderStatus();
+    renderBid();
+    renderPlayers();
+    renderHand();
+    renderControls();
+    renderLogMobile();
+    // Buzz the phone when it becomes the local player's turn (subtle nudge)
+    const cur = currentPlayer();
+    const isMe = cur && cur.peerId && cur.peerId === NET.myId;
+    const sig = state.appPhase + ':' + state.phase + ':' + state.current;
+    if (state.appPhase === 'game' && state.phase === 'bidding' && isMe && lastTurnSig && lastTurnSig !== sig) {
+      try { if (navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch (e) {}
+    }
+    lastTurnSig = sig;
+  }
+
+  function renderHeader() {
+    const code = document.getElementById('mob-code');
+    const roundInfo = document.getElementById('mob-round-info');
+    if (code) code.textContent = ONLINE.roomCode ? ('CODE: ' + ONLINE.roomCode) : '';
+    if (roundInfo) {
+      const alive = state.alivePlayers ? state.alivePlayers().length : (state.players ? state.players.filter(p => p.alive).length : 0);
+      const total = state.players ? state.players.length : 0;
+      const round = state.round || 1;
+      if (state.appPhase === 'game' && total > 0) {
+        roundInfo.textContent = `HAND ${round} · ${alive}/${total} ALIVE`;
+      } else {
+        roundInfo.textContent = '';
+      }
+    }
+  }
+
+  function renderStatus() {
+    const el = document.getElementById('mob-status');
+    if (!el) return;
+    // Build a clean status string without copying nested HTML from the banner
+    if (state.phase === 'gameover') {
+      const w = state.alivePlayers()[0];
+      el.innerHTML = `<div style="color:#80f080;font-size:14px;letter-spacing:2px;">🏆 ${w ? w.name : '???'} WINS THE TABLE</div>`;
+      return;
+    }
+    if (state.phase === 'reveal') {
+      el.innerHTML = `<div style="color:#f4d27a;letter-spacing:2px;">— THE CUPS BE LIFTED —</div>`;
+      return;
+    }
+    if (state.phase === 'rolling') {
+      el.innerHTML = `<div style="color:#c89860;letter-spacing:2px;">SHAKING DICE...</div>`;
+      return;
+    }
+    const cur = currentPlayer();
+    const isMe = cur && cur.peerId && cur.peerId === NET.myId;
+    if (state.bid && cur) {
+      const turnTag = isMe
+        ? '<span style="color:#80f080;">YOUR TURN</span>'
+        : `<span style="color:#c89860;">${cur.name} to act</span>`;
+      el.innerHTML = `<div style="font-size:9px;color:#c89860;margin-bottom:4px;letter-spacing:2px;">CURRENT BID</div>
+        <div>${state.bid.qty}× face ${state.bid.face}${state.bid.face===1?' (ones wild)':''} — ${turnTag}</div>`;
+    } else if (cur) {
+      el.innerHTML = isMe
+        ? '<div style="color:#80f080;letter-spacing:2px;">YOUR TURN — OPEN THE BIDDING</div>'
+        : `<div style="color:#c89860;letter-spacing:2px;">${cur.name} OPENS THE BIDDING</div>`;
+    } else {
+      el.innerHTML = `<div style="color:#8a6840;letter-spacing:2px;">Awaiting...</div>`;
+    }
+  }
+
+  function renderBid() {
+    const el = document.getElementById('mob-bid-display');
+    if (!el) return;
+    if (state.phase === 'reveal' && state.reveal) {
+      const r = state.reveal;
+      const verdict = r.t >= 3.0 || (typeof r.t === 'undefined');
+      const color = r.truth ? '#80f080' : '#f08040';
+      el.innerHTML = `
+        <div style="text-align:center;">
+          <div style="font-size:9px;color:#c89860;letter-spacing:2px;margin-bottom:6px;">CLAIMED ${r.claimed} × ${r.face}</div>
+          <div style="font-size:18px;color:${color};">ACTUAL: ${r.actual}</div>
+          <div style="font-size:11px;color:${color};margin-top:6px;letter-spacing:2px;">${r.truth ? 'TRUTH' : 'LIAR!'}</div>
+        </div>`;
+      return;
+    }
+    if (!state.bid) {
+      const cur = currentPlayer();
+      el.innerHTML = `<span class="mob-bid-empty">${cur ? cur.name + ' OPENS THE BIDDING' : 'WAITING...'}</span>`;
+      return;
+    }
+    el.innerHTML = '';
+    const block = document.createElement('div');
+    block.style.display = 'flex';
+    block.style.alignItems = 'center';
+    block.style.gap = '12px';
+    const qty = document.createElement('span');
+    qty.className = 'mob-bid-qty';
+    qty.textContent = state.bid.qty;
+    block.appendChild(qty);
+    const x = document.createElement('span');
+    x.className = 'mob-bid-x';
+    x.textContent = '×';
+    block.appendChild(x);
+    const die = document.createElement('canvas');
+    die.className = 'mob-bid-die';
+    die.width = 18; die.height = 18;
+    drawDie(die.getContext('2d'), 0, 0, state.bid.face, 18, false, state.bid.face === 1);
+    block.appendChild(die);
+    el.appendChild(block);
+    const bidder = state.players[state.bid.by];
+    if (bidder) {
+      const sub = document.createElement('div');
+      sub.className = 'mob-bid-by';
+      sub.style.width = '100%';
+      sub.style.textAlign = 'center';
+      sub.textContent = '— ' + bidder.name;
+      el.appendChild(sub);
+    }
+  }
+
+  function renderPlayers() {
+    const wrap = document.getElementById('mob-players-list');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    if (!state.players || !state.players.length) return;
+    const myId = NET.myId;
+    for (let i = 0; i < state.players.length; i++) {
+      const p = state.players[i];
+      const row = document.createElement('div');
+      row.className = 'mob-player-row';
+      if (state.current === i && state.phase === 'bidding') row.classList.add('current');
+      if (p.peerId && p.peerId === myId) row.classList.add('you');
+      if (!p.alive) row.classList.add('dead');
+      // Avatar
+      const c = document.createElement('canvas');
+      const charObj = AVATARS.find(a => a.id === p.spriteId) || PIRATES.find(pp => pp.id === p.spriteId);
+      const sprite = (charObj && charObj.sprite) || p.sprite;
+      const native = sprite ? spriteNativeSize(sprite) : 16;
+      c.width = native; c.height = native;
+      const cx = c.getContext('2d');
+      cx.imageSmoothingEnabled = false;
+      if (sprite) drawSprite(cx, sprite, 0, 0, 1);
+      row.appendChild(c);
+      // Meta
+      const meta = document.createElement('div');
+      meta.className = 'mob-player-meta';
+      const nm = document.createElement('div');
+      nm.className = 'mob-player-name';
+      // (YOU) tag is added via CSS ::after on .you rows so we don't dupe text
+      nm.textContent = p.name;
+      meta.appendChild(nm);
+      const tg = document.createElement('div');
+      tg.className = 'mob-player-tag';
+      tg.textContent = p.isAI ? (p.ai ? p.ai.trait : 'AI') : (charObj ? charObj.tag || charObj.name : '');
+      meta.appendChild(tg);
+      // During reveal — show this player's actual dice values, with matches highlighted
+      if (state.phase === 'reveal' && state.reveal && p.alive) {
+        const dpp = state.reveal.dicePerPlayer && state.reveal.dicePerPlayer[p.id];
+        if (dpp && dpp.length) {
+          const revRow = document.createElement('div');
+          revRow.className = 'mob-reveal-dice';
+          for (const face of dpp) {
+            const dc = document.createElement('canvas');
+            dc.width = 14; dc.height = 14;
+            const dctx = dc.getContext('2d');
+            dctx.imageSmoothingEnabled = false;
+            drawDie(dctx, 0, 0, face, 14, false, face === 1);
+            const isMatch = face === state.reveal.face || (state.reveal.face !== 1 && face === 1);
+            if (isMatch) dc.classList.add('match');
+            revRow.appendChild(dc);
+          }
+          meta.appendChild(revRow);
+        }
+      }
+      row.appendChild(meta);
+      // Dice indicator (5 dots) — hidden during reveal since we show actual dice instead
+      if (state.phase !== 'reveal') {
+        const dots = document.createElement('div');
+        dots.className = 'mob-player-dice';
+        for (let j = 0; j < 5; j++) {
+          const dot = document.createElement('div');
+          dot.className = 'mob-dice-dot' + (j < p.dice.length ? '' : ' empty');
+          dots.appendChild(dot);
+        }
+        row.appendChild(dots);
+      }
+      // Status
+      const st = document.createElement('div');
+      st.className = 'mob-player-status';
+      if (!p.alive) { st.textContent = 'OUT'; st.classList.add('dead'); }
+      else if (state.current === i && state.phase === 'bidding') { st.textContent = 'TURN'; st.classList.add('turn'); }
+      else { st.textContent = (p.dice.length || 0) + 'd'; }
+      row.appendChild(st);
+      wrap.appendChild(row);
+    }
+  }
+
+  function renderHand() {
+    const wrap = document.getElementById('mob-hand-dice-list');
+    const label = document.getElementById('mob-hand-label');
+    if (!wrap || !label) return;
+    // Find local player
+    const me = state.players.find(p => p.peerId && p.peerId === NET.myId)
+            || state.players.find(p => !p.isAI);
+    if (!me || !me.alive || !me.dice || !me.dice.length) {
+      label.textContent = me && !me.alive ? 'YE BE OUT' : 'YER HAND';
+      wrap.innerHTML = '';
+      return;
+    }
+    label.textContent = me.name + ' — YER HAND';
+    const sig = me.id + ':' + me.dice.join(',');
+    if (wrap._sig === sig) return;
+    wrap._sig = sig;
+    wrap.innerHTML = '';
+    for (const face of me.dice) {
+      const c = document.createElement('canvas');
+      c.width = 18; c.height = 18;
+      const cx = c.getContext('2d');
+      cx.imageSmoothingEnabled = false;
+      drawDie(cx, 0, 0, face, 18, false, face === 1);
+      wrap.appendChild(c);
+    }
+  }
+
+  function renderControls() {
+    document.getElementById('mob-qty-val').textContent = humanBid.qty;
+    drawDie(document.getElementById('mob-face-icon').getContext('2d'), 0, 0, humanBid.face, 12, false, humanBid.face === 1);
+    // Mirror enable/disable from desktop buttons
+    const desktopBid = document.getElementById('btn-bid');
+    const desktopLiar = document.getElementById('btn-liar');
+    const myBidBtn = document.getElementById('mob-bid-btn');
+    const myLiarBtn = document.getElementById('mob-liar-btn');
+    myBidBtn.disabled = desktopBid.disabled;
+    myLiarBtn.disabled = desktopLiar.disabled;
+    // When it's not your turn, replace the action row with a clear waiting message
+    const cur = currentPlayer();
+    const isMyTurn = cur && state.phase === 'bidding' &&
+      ((cur.peerId && cur.peerId === NET.myId) || (state.netMode === 'offline' && !cur.isAI));
+    const controls = document.querySelector('#mobile-view .mob-controls');
+    let wait = document.getElementById('mob-waiting-msg');
+    const bidRow = document.querySelector('#mobile-view .mob-bid-row');
+    const actionRow = document.querySelector('#mobile-view .mob-action-row');
+    if (state.phase === 'bidding' && !isMyTurn && cur) {
+      if (!wait) {
+        wait = document.createElement('div');
+        wait.id = 'mob-waiting-msg';
+        wait.className = 'mob-waiting-msg';
+        controls.insertBefore(wait, bidRow);
+      }
+      const turnTag = cur.isAI ? `${cur.name}<br><span style="font-size:9px;color:#8a6840;">(${cur.ai ? cur.ai.trait : 'AI'} thinking...)</span>` : cur.name;
+      wait.innerHTML = `WAITING FOR <span class="who">${turnTag}</span>`;
+      bidRow.style.display = 'none';
+      actionRow.style.display = 'none';
+    } else {
+      if (wait) wait.remove();
+      bidRow.style.display = '';
+      actionRow.style.display = '';
+    }
+    // Audio button shows current state
+    const audioBtn = document.getElementById('mob-audio-btn');
+    if (audioBtn) {
+      const muted = AUDIO.muted;
+      audioBtn.textContent = muted ? '🔇' : '♪';
+      audioBtn.title = muted ? 'Music: OFF' : 'Music: ON';
+    }
+  }
+
+  function renderLogMobile() {
+    const el = document.getElementById('mob-log-panel');
+    if (!el) return;
+    el.innerHTML = state.log.map(e => `<div class="log-entry ${e.cls}">${e.msg}</div>`).join('');
+  }
+
+  // Wire mobile buttons → reuse desktop handlers / state
+  // Light haptic feedback on actions (no-op where unsupported, e.g. iOS Safari)
+  function vibrate(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+  function wireButtons() {
+    // Stepper buttons — gentle tick haptic
+    const stepperMap = [
+      ['mob-qty-down', 'qty-down'],
+      ['mob-qty-up', 'qty-up'],
+      ['mob-face-down', 'face-down'],
+      ['mob-face-up', 'face-up'],
+    ];
+    for (const [mobId, deskId] of stepperMap) {
+      const m = document.getElementById(mobId);
+      const d = document.getElementById(deskId);
+      if (m && d) {
+        m.addEventListener('click', () => {
+          vibrate(15);
+          d.click();
+          renderControls();
+        });
+      }
+    }
+    // Action buttons — stronger haptic (decisive moment)
+    const bidBtn = document.getElementById('mob-bid-btn');
+    const liarBtn = document.getElementById('mob-liar-btn');
+    if (bidBtn) bidBtn.addEventListener('click', () => {
+      if (bidBtn.disabled) return;
+      vibrate([30, 40, 30]);
+      document.getElementById('btn-bid').click();
+      renderControls();
+    });
+    if (liarBtn) liarBtn.addEventListener('click', () => {
+      if (liarBtn.disabled) return;
+      vibrate([60, 30, 80]);
+      document.getElementById('btn-liar').click();
+      renderControls();
+    });
+    document.getElementById('mob-audio-btn').addEventListener('click', () => {
+      vibrate(15);
+      document.getElementById('audio-toggle').click();
+      renderControls();
+    });
+    document.getElementById('mob-leave-btn').addEventListener('click', () => {
+      vibrate(20);
+      if (confirm('Leave the table?')) {
+        if (ONLINE.mode) leaveOnline();
+        else { resetForNewGame(); showTitle(); setInGame(false); }
+      }
+    });
+    document.getElementById('mob-log-toggle').addEventListener('click', () => {
+      const panel = document.getElementById('mob-log-panel');
+      panel.classList.toggle('hidden');
+      const btn = document.getElementById('mob-log-toggle');
+      btn.textContent = panel.classList.contains('hidden') ? '▼ SHIP\'S LOG' : '▲ SHIP\'S LOG';
+    });
+  }
+  wireButtons();
+
+  // Recheck on resize/orientation change
+  mql.addEventListener('change', renderAll);
+  window.addEventListener('resize', renderAll);
+  window.addEventListener('orientationchange', () => setTimeout(renderAll, 250));
+
+  return { renderAll, setInGame, isMobilePortrait };
+})();
+
+// Hook updateBanner / updateControls / renderLog so mobile UI stays in sync
+const _origMobUpdateBanner = updateBanner;
+updateBanner = function() {
+  _origMobUpdateBanner();
+  MOBILE.renderAll();
+};
+const _origMobUpdateControls = updateControls;
+updateControls = function() {
+  _origMobUpdateControls();
+  MOBILE.renderAll();
+};
+const _origMobRenderLog = renderLog;
+renderLog = function() {
+  _origMobRenderLog();
+  MOBILE.renderAll();
+};
+const _origMobSyncStepper = syncStepper;
+syncStepper = function() {
+  _origMobSyncStepper();
+  MOBILE.renderAll();
+};
+
+// Toggle the body.in-game class so the mobile view shows when actually playing
+const _origMobBeginGame = beginGame;
+beginGame = function() {
+  _origMobBeginGame();
+  MOBILE.setInGame(true);
+  MOBILE.renderAll();
+};
+const _origMobApplyRemoteState = applyRemoteState;
+applyRemoteState = function(data) {
+  _origMobApplyRemoteState(data);
+  if (state.appPhase === 'game' || state.phase === 'bidding' || state.phase === 'reveal' || state.phase === 'rolling' || state.phase === 'gameover') {
+    MOBILE.setInGame(true);
+  }
+  MOBILE.renderAll();
+};
+const _origMobShowTitle = showTitle;
+showTitle = function() {
+  _origMobShowTitle();
+  MOBILE.setInGame(false);
+};
+const _origMobShowSetup = showSetup;
+showSetup = function() {
+  _origMobShowSetup();
+  MOBILE.setInGame(false);
+};
+const _origMobLeaveOnline = leaveOnline;
+leaveOnline = function() {
+  _origMobLeaveOnline();
+  MOBILE.setInGame(false);
+};
 </script>
 </body>
 </html>
