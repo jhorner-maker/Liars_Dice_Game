@@ -1,0 +1,4926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Liar's Dice — Dead Man's Chest</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; background: #000; overflow: hidden;
+    font-family: 'Press Start 2P', monospace; color: #e8d8a8;
+    user-select: none;
+  }
+  #app {
+    width: 100vw; height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #1a1208 0%, #000 70%);
+  }
+  canvas#scene {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    width: min(100vw, calc(100vh * 16 / 9));
+    height: min(100vh, calc(100vw * 9 / 16));
+    display: block;
+    background: #000;
+  }
+  #menu {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background:
+      linear-gradient(to bottom, rgba(0,0,0,0.85), rgba(0,0,0,0.95)),
+      repeating-linear-gradient(0deg, #2a1a08 0 4px, #1a1004 4px 8px);
+    z-index: 100; padding: 4vh 4vw;
+    overflow-y: auto;
+  }
+  #menu h1 {
+    font-size: clamp(18px, 3vw, 36px);
+    color: #f4d27a;
+    text-shadow: 4px 4px 0 #6a2010, 0 0 20px #ff8030;
+    margin-bottom: 1em; text-align: center;
+    letter-spacing: 2px;
+  }
+  .menu-section { margin: 1em 0; text-align: center; max-width: 720px; width: 100%; }
+  .menu-label { font-size: 11px; color: #c89860; margin-bottom: 0.8em; }
+  .player-input {
+    font-family: 'Press Start 2P', monospace;
+    background: #2a1a08; color: #f4d27a; border: 3px solid #6a4020;
+    padding: 0.8em 1em; font-size: 12px; outline: none;
+    text-align: center; width: 280px;
+  }
+  .player-input:focus { border-color: #f4d27a; }
+  .ai-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+    gap: 10px; margin-top: 0.6em;
+    max-width: 720px;
+  }
+  .ai-card {
+    background: #1a1004; border: 3px solid #4a3010;
+    padding: 8px; cursor: pointer;
+    transition: all 0.15s;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .ai-card:hover { border-color: #c89860; transform: translateY(-2px); }
+  .ai-card.selected {
+    border-color: #f4d27a;
+    box-shadow: 0 0 0 2px #6a2010, 0 0 20px rgba(244,210,122,0.3);
+    background: #2a1a08;
+  }
+  .ai-card canvas {
+    image-rendering: pixelated; width: 64px; height: 64px;
+    background: #000; margin-bottom: 6px;
+  }
+  .ai-name { font-size: 9px; color: #f4d27a; margin-bottom: 3px; text-align: center; }
+  .ai-trait { font-size: 7px; color: #8a6840; text-align: center; line-height: 1.4; }
+  .btn {
+    font-family: 'Press Start 2P', monospace;
+    background: #6a2010; color: #f4d27a;
+    border: 3px solid #f4d27a; padding: 1em 2em;
+    font-size: 14px; cursor: pointer;
+    transition: all 0.15s; margin: 0.5em;
+    text-shadow: 2px 2px 0 #2a0808;
+  }
+  .btn:hover { background: #8a3020; transform: translateY(-2px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.small { padding: 0.6em 1em; font-size: 10px; }
+  .btn.ghost { background: transparent; }
+  #hud {
+    position: fixed; inset: 0; pointer-events: none; z-index: 50;
+    display: flex; flex-direction: column;
+  }
+  #log-panel {
+    position: absolute; top: 12px; right: 12px;
+    width: clamp(180px, 22vw, 280px); height: clamp(120px, 25vh, 200px);
+    background: rgba(10,6,2,0.85); border: 2px solid #4a3010;
+    padding: 8px; font-size: 8px; line-height: 1.6;
+    overflow-y: auto; pointer-events: auto;
+    color: #c89860;
+  }
+  #log-panel .log-title { color: #f4d27a; margin-bottom: 4px; font-size: 8px; }
+  #log-panel .log-entry { margin-bottom: 4px; }
+  #log-panel .log-entry.bid { color: #d8b878; }
+  #log-panel .log-entry.liar { color: #f48030; }
+  #log-panel .log-entry.win { color: #80f080; }
+  #log-panel .log-entry.eliminate { color: #f04040; }
+  #status-banner {
+    position: absolute; top: 12px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,6,2,0.9); border: 2px solid #6a4020;
+    padding: 8px 16px; font-size: 10px;
+    color: #f4d27a; pointer-events: auto;
+    text-align: center; min-width: 200px;
+  }
+  #controls {
+    position: absolute; bottom: 12px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,6,2,0.92); border: 3px solid #6a4020;
+    padding: 10px 16px;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; pointer-events: auto;
+  }
+  /* Desktop: tuck controls into bottom-right so the player sprite is fully visible */
+  @media (min-width: 900px) {
+    #controls {
+      bottom: 18px; right: 18px;
+      left: auto; transform: none;
+      align-items: stretch;
+      max-width: 360px;
+    }
+  }
+  .bid-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .bid-label { font-size: 9px; color: #c89860; }
+  .hand-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px;
+    background: linear-gradient(to bottom, #2a1a0a, #1a0e04);
+    border: 2px solid #4a3010;
+    margin-bottom: 4px;
+  }
+  .hand-row.hidden { display: none; }
+  .hand-label { font-size: 9px; color: #f4d27a; letter-spacing: 1px; }
+  #hand-dice { display: flex; gap: 4px; }
+  #hand-dice canvas {
+    width: 36px; height: 36px;
+    image-rendering: pixelated;
+    background: #fff0c8;
+    border: 1px solid #1a0a04;
+  }
+  .stepper {
+    display: flex; align-items: center; gap: 4px;
+    background: #1a1004; border: 2px solid #4a3010; padding: 2px;
+  }
+  .stepper button {
+    font-family: 'Press Start 2P', monospace;
+    background: #4a3010; color: #f4d27a; border: none;
+    width: 20px; height: 20px; cursor: pointer; font-size: 10px;
+  }
+  .stepper button:hover { background: #6a4020; }
+  .stepper-value { min-width: 28px; text-align: center; font-size: 11px; color: #f4d27a; }
+  .face-icon { width: 24px; height: 24px; image-rendering: pixelated; }
+  .action-row { display: flex; gap: 8px; }
+  .btn-bid { background: #2a4a10; border-color: #80c040; }
+  .btn-bid:hover { background: #3a6a18; }
+  .btn-liar { background: #6a1010; border-color: #f04040; }
+  .btn-liar:hover { background: #8a2020; }
+  .btn-bid:disabled, .btn-liar:disabled { background: #2a1a08; border-color: #4a3010; color: #6a5030; }
+  #audio-toggle {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(10,6,2,0.85); border: 2px solid #4a3010;
+    color: #f4d27a; padding: 6px 10px; font-size: 8px;
+    font-family: 'Press Start 2P', monospace; cursor: pointer;
+    pointer-events: auto;
+  }
+  #audio-toggle:hover { border-color: #f4d27a; }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: #1a1004; }
+  ::-webkit-scrollbar-thumb { background: #6a4020; }
+  .hidden { display: none !important; }
+  #toast {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.92); border: 4px solid #f4d27a;
+    padding: 24px 36px; font-size: 18px; color: #f4d27a;
+    z-index: 200; pointer-events: none;
+    text-align: center; text-shadow: 3px 3px 0 #6a2010;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  #toast.show { opacity: 1; }
+  #title-screen {
+    position: fixed; inset: 0; z-index: 90;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 90%);
+  }
+  #title-screen.hidden { display: none; }
+  #title-screen .title-stack { pointer-events: auto; text-align: center; padding: 4vh 4vw; }
+  #title-screen h1 {
+    font-size: clamp(28px, 6vw, 64px);
+    color: #f8e8a8;
+    text-shadow: 4px 4px 0 #6a2010, 8px 8px 0 #2a0808, 0 0 30px rgba(255,140,40,0.6);
+    margin-bottom: 0.4em;
+    letter-spacing: 4px;
+    animation: titlePulse 3s ease-in-out infinite;
+  }
+  @keyframes titlePulse {
+    0%, 100% { text-shadow: 4px 4px 0 #6a2010, 8px 8px 0 #2a0808, 0 0 30px rgba(255,140,40,0.6); }
+    50%      { text-shadow: 4px 4px 0 #6a2010, 8px 8px 0 #2a0808, 0 0 50px rgba(255,200,80,0.9); }
+  }
+  #title-screen h2 {
+    font-size: clamp(10px, 1.6vw, 18px);
+    color: #d8a868; margin-bottom: 2em;
+    letter-spacing: 3px;
+  }
+  #title-screen .btn-new {
+    font-family: 'Press Start 2P', monospace;
+    background: #6a2010; color: #f4d27a;
+    border: 4px solid #f4d27a;
+    padding: 1.2em 2.4em;
+    font-size: clamp(14px, 1.8vw, 22px);
+    cursor: pointer;
+    text-shadow: 2px 2px 0 #2a0808;
+    box-shadow: 0 0 0 4px #2a0808, 0 0 30px rgba(255,140,40,0.4);
+    animation: btnGlow 1.6s ease-in-out infinite;
+    letter-spacing: 3px;
+  }
+  @keyframes btnGlow {
+    0%, 100% { box-shadow: 0 0 0 4px #2a0808, 0 0 20px rgba(255,140,40,0.4); transform: scale(1); }
+    50%      { box-shadow: 0 0 0 4px #2a0808, 0 0 50px rgba(255,200,80,0.9); transform: scale(1.04); }
+  }
+  #title-screen .btn-new:hover { background: #8a3020; }
+  #title-screen .credits { margin-top: 2em; font-size: 8px; color: #8a6840; letter-spacing: 2px; }
+  .mode-toggle { display: flex; gap: 10px; justify-content: center; margin-top: 0.6em; }
+  .mode-btn {
+    font-family: 'Press Start 2P', monospace;
+    background: #1a1004; color: #c89860; border: 3px solid #4a3010;
+    padding: 0.8em 1.4em; font-size: 11px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-btn:hover { border-color: #c89860; }
+  .mode-btn.active {
+    background: #6a2010; color: #f4d27a; border-color: #f4d27a;
+    box-shadow: 0 0 20px rgba(244,210,122,0.3);
+  }
+  .stepper-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 0.6em; }
+  .stepper-big { display: flex; align-items: center; gap: 8px; background: #1a1004; border: 3px solid #4a3010; padding: 4px; }
+  .stepper-big button {
+    font-family: 'Press Start 2P', monospace;
+    background: #4a3010; color: #f4d27a; border: none;
+    width: 32px; height: 32px; cursor: pointer; font-size: 14px;
+  }
+  .stepper-big button:hover { background: #6a4020; }
+  .stepper-big-value { min-width: 40px; text-align: center; font-size: 18px; color: #f4d27a; }
+  .ai-card.locked { opacity: 0.4; cursor: not-allowed; border-color: #2a1808; }
+  .ai-card .ai-tag { font-size: 6px; color: #8a6840; margin-top: 3px; letter-spacing: 1px; }
+  #curtain {
+    position: fixed; inset: 0;
+    background: linear-gradient(to bottom, #1a0a04 0%, #0a0402 100%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 80; cursor: pointer;
+    text-align: center; padding: 4vh 4vw;
+  }
+  #curtain.hidden { display: none; }
+  #curtain .curtain-label { font-size: clamp(8px, 1vw, 12px); color: #c89860; margin-bottom: 1em; letter-spacing: 3px; }
+  #curtain .curtain-name {
+    font-size: clamp(18px, 4vw, 36px);
+    color: #f4d27a; margin-bottom: 0.8em;
+    text-shadow: 4px 4px 0 #6a2010, 0 0 20px rgba(255,140,40,0.5);
+    letter-spacing: 2px;
+  }
+  #curtain canvas {
+    image-rendering: pixelated; width: 96px; height: 96px;
+    background: #000; margin-bottom: 1em;
+    border: 3px solid #6a4020;
+  }
+  #curtain .curtain-tap {
+    font-size: clamp(10px, 1.4vw, 16px);
+    color: #f4d27a; margin-top: 1.2em;
+    animation: blinkTap 1.2s steps(2,end) infinite;
+  }
+  @keyframes blinkTap { 50% { opacity: 0.3; } }
+
+  /* ONLINE LOBBY */
+  .title-online-row {
+    display: flex; gap: 12px; justify-content: center;
+    margin-top: 1.4em; flex-wrap: wrap;
+  }
+  #online-lobby, #online-join {
+    position: fixed; inset: 0;
+    z-index: 95;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      linear-gradient(to bottom, rgba(0,0,0,0.92), rgba(20,10,4,0.97)),
+      repeating-linear-gradient(0deg, #1a1004 0 4px, #0a0602 4px 8px);
+    overflow-y: auto;
+    padding: 4vh 4vw;
+  }
+  #online-lobby.hidden, #online-join.hidden { display: none; }
+  .lobby-stack {
+    width: 100%; max-width: 540px;
+    display: flex; flex-direction: column; gap: 1.4em;
+    text-align: center;
+  }
+  .lobby-brand {
+    font-size: clamp(14px, 2vw, 22px);
+    color: #f4d27a;
+    text-shadow: 3px 3px 0 #6a2010;
+    letter-spacing: 3px; margin-bottom: 0.4em;
+  }
+  .lobby-section { display: flex; flex-direction: column; gap: 0.6em; }
+  .lobby-label {
+    font-size: 10px; color: #c89860;
+    letter-spacing: 2px;
+  }
+  .lobby-code-block {
+    background: #1a1004; border: 3px solid #6a4020;
+    padding: 1em; display: flex; flex-direction: column;
+    gap: 0.7em; align-items: center;
+  }
+  .lobby-code {
+    font-size: clamp(28px, 5vw, 44px);
+    color: #f4d27a; letter-spacing: 6px;
+    text-shadow: 0 0 20px rgba(255,200,80,0.5);
+    user-select: all;
+  }
+  .lobby-help {
+    font-size: 8px; color: #8a6840;
+    line-height: 1.6;
+  }
+  .lobby-input {
+    text-transform: uppercase;
+    letter-spacing: 6px;
+    font-size: 18px;
+  }
+  .lobby-players {
+    display: flex; flex-direction: column; gap: 6px;
+    background: #1a1004; border: 2px solid #4a3010;
+    padding: 0.6em; min-height: 120px;
+  }
+  .lobby-player-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 8px;
+    background: #2a1808; border: 2px solid #4a3010;
+    text-align: left;
+  }
+  .lobby-player-row.you { border-color: #f4d27a; }
+  .lobby-player-row.host-tag { background: #2a1a08; }
+  .lobby-player-row canvas {
+    width: 40px; height: 40px;
+    image-rendering: pixelated;
+    background: #0a0604; border: 1px solid #4a3010;
+  }
+  .lobby-player-name {
+    flex: 1;
+    font-size: 10px; color: #f4d27a;
+  }
+  .lobby-player-tag {
+    font-size: 7px; color: #8a6840;
+    margin-top: 3px;
+  }
+  .lobby-player-status {
+    font-size: 8px; color: #80c040;
+    border: 1px solid #80c040;
+    padding: 2px 6px;
+  }
+  .lobby-player-status.waiting { color: #c89860; border-color: #c89860; }
+  .lobby-player-status.host { color: #f48030; border-color: #f48030; }
+  .lobby-actions {
+    display: flex; gap: 12px; justify-content: center;
+    align-items: center; flex-wrap: wrap;
+    margin-top: 0.4em;
+  }
+  .host-only.hidden, .client-only.hidden { display: none !important; }
+
+  /* ORIENTATION PROMPT — shown only on portrait phones */
+  #orientation-prompt {
+    position: fixed; inset: 0;
+    z-index: 999;
+    background: linear-gradient(to bottom, #0a0604, #1a0a04);
+    display: flex; align-items: center; justify-content: center;
+    color: #f4d27a; text-align: center; padding: 2em;
+  }
+  #orientation-prompt.hidden { display: none; }
+  .orient-stack { display: flex; flex-direction: column; align-items: center; gap: 1em; }
+  .orient-icon {
+    font-size: 64px;
+    animation: rotateHint 2s ease-in-out infinite;
+  }
+  @keyframes rotateHint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+  }
+  .orient-title {
+    font-size: 16px; letter-spacing: 3px;
+    text-shadow: 2px 2px 0 #6a2010;
+  }
+  .orient-text {
+    font-size: 10px; color: #c89860; letter-spacing: 1px;
+  }
+  /* Show the orientation prompt only on portrait small screens */
+  @media (orientation: portrait) and (max-width: 900px) {
+    #orientation-prompt:not(.hidden) { display: flex; }
+  }
+  @media (orientation: landscape), (min-width: 901px) {
+    #orientation-prompt { display: none !important; }
+  }
+  #gameover-overlay {
+    position: fixed; inset: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.75), rgba(20,10,4,0.92));
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 70; padding: 4vh 4vw;
+  }
+  #gameover-overlay.hidden { display: none; }
+  .go-stack { text-align: center; }
+  .go-label { font-size: clamp(10px, 1.4vw, 16px); color: #c89860; margin-bottom: 0.6em; letter-spacing: 4px; }
+  .go-name {
+    font-size: clamp(22px, 5vw, 48px); color: #f4d27a;
+    text-shadow: 4px 4px 0 #6a2010, 0 0 28px rgba(255,200,80,0.7);
+    margin-bottom: 0.6em;
+    animation: titlePulse 2.4s ease-in-out infinite;
+  }
+  #go-portrait {
+    image-rendering: pixelated; width: 96px; height: 96px;
+    background: #000; margin-bottom: 1.2em;
+    border: 3px solid #f4d27a;
+    box-shadow: 0 0 30px rgba(255,200,80,0.5);
+  }
+  .go-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene" width="480" height="270"></canvas>
+</div>
+<div id="hud" class="hidden">
+  <button id="audio-toggle" title="Toggle audio">[ MUSIC: ON ]</button>
+  <div id="status-banner">Awaiting your bid...</div>
+  <div id="log-panel">
+    <div class="log-title">SHIP'S LOG</div>
+    <div id="log-entries"></div>
+  </div>
+  <div id="controls">
+    <div id="hand-display" class="hand-row hidden">
+      <span class="hand-label" id="hand-label">YER HAND</span>
+      <div id="hand-dice"></div>
+    </div>
+    <div class="bid-row">
+      <span class="bid-label">BID:</span>
+      <div class="stepper">
+        <button id="qty-down">-</button>
+        <span class="stepper-value" id="qty-val">1</span>
+        <button id="qty-up">+</button>
+      </div>
+      <span class="bid-label">×</span>
+      <div class="stepper">
+        <button id="face-down">-</button>
+        <canvas id="face-icon" class="face-icon" width="12" height="12"></canvas>
+        <button id="face-up">+</button>
+      </div>
+    </div>
+    <div class="action-row">
+      <button id="btn-bid" class="btn small btn-bid">RAISE BID</button>
+      <button id="btn-liar" class="btn small btn-liar">CALL LIAR!</button>
+    </div>
+  </div>
+</div>
+<div id="title-screen">
+  <div class="title-stack">
+    <h1>LIAR'S DICE</h1>
+    <h2>~ Dead Man's Chest ~</h2>
+    <button class="btn-new" id="btn-new-game">NEW GAME</button>
+    <div class="title-online-row">
+      <button class="btn ghost small" id="btn-host-online">HOST ONLINE</button>
+      <button class="btn ghost small" id="btn-join-online">JOIN GAME</button>
+    </div>
+    <div class="credits">A POKEMON-STYLE PIRATE GAMBLE · WEB AUDIO · CANVAS</div>
+  </div>
+</div>
+
+<!-- ONLINE LOBBY (host or client) -->
+<div id="online-lobby" class="hidden">
+  <div class="lobby-stack">
+    <div class="lobby-brand">LIAR'S DICE — ONLINE TABLE</div>
+    <div class="lobby-code-block">
+      <div class="lobby-label">GAME CODE</div>
+      <div class="lobby-code" id="lobby-code">------</div>
+      <button class="btn small" id="btn-copy-code">COPY INVITE LINK</button>
+      <div class="lobby-help" id="lobby-help">Share this code or link with up to 5 friends.</div>
+    </div>
+    <div class="lobby-section">
+      <div class="lobby-label">PLAYERS AT THE TABLE</div>
+      <div class="lobby-players" id="lobby-players"></div>
+    </div>
+    <div class="lobby-section host-only" id="lobby-ai-section">
+      <div class="lobby-label">AI OPPONENTS (HOST ONLY)</div>
+      <div class="ai-grid" id="lobby-ai-grid"></div>
+    </div>
+    <div class="lobby-actions">
+      <button class="btn ghost small" id="btn-leave-lobby">⟵ LEAVE</button>
+      <button class="btn host-only" id="btn-start-online" disabled>START GAME</button>
+      <span class="lobby-help client-only" id="lobby-waiting">Waiting for host to start...</span>
+    </div>
+  </div>
+</div>
+
+<!-- ONLINE JOIN — enter game code -->
+<div id="online-join" class="hidden">
+  <div class="lobby-stack">
+    <div class="lobby-brand">JOIN A TABLE</div>
+    <div class="lobby-section">
+      <div class="lobby-label">ENTER GAME CODE</div>
+      <input class="player-input lobby-input" id="join-code-input" maxlength="6" placeholder="ABC123">
+    </div>
+    <div class="lobby-actions">
+      <button class="btn ghost small" id="btn-back-to-title">⟵ BACK</button>
+      <button class="btn" id="btn-confirm-join">JOIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- ORIENTATION PROMPT — CSS @media controls when this shows (portrait mobile only) -->
+<div id="orientation-prompt">
+  <div class="orient-stack">
+    <div class="orient-icon">⟳</div>
+    <div class="orient-title">ROTATE YOUR PHONE</div>
+    <div class="orient-text">Hold yer phone sideways to play, matey.</div>
+  </div>
+</div>
+<div id="menu" class="hidden">
+  <h1 style="font-size: clamp(16px, 2.6vw, 28px); margin-bottom: 0.6em;">SET YE CREW</h1>
+  <div class="menu-section">
+    <div class="menu-label">GAME MODE</div>
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="solo">SOLO (vs AI)</button>
+      <button class="mode-btn" data-mode="multi">LOCAL MULTI</button>
+    </div>
+  </div>
+  <div class="menu-section" id="multi-config" style="display:none;">
+    <div class="menu-label">HOW MANY HUMAN PLAYERS?</div>
+    <div class="stepper-row">
+      <div class="stepper-big">
+        <button id="humans-down">-</button>
+        <span class="stepper-big-value" id="humans-val">2</span>
+        <button id="humans-up">+</button>
+      </div>
+      <span style="font-size:9px; color:#8a6840;">PASS-AND-PLAY · 2-5 HUMANS</span>
+    </div>
+  </div>
+  <div class="menu-section">
+    <div class="menu-label" id="opponent-label">CHOOSE YER OPPONENTS (1-5)</div>
+    <div class="ai-grid" id="ai-grid"></div>
+  </div>
+  <div class="menu-section" id="avatar-section">
+    <div class="menu-label" id="avatar-label">CHOOSE YER CAPTAIN</div>
+    <div class="ai-grid" id="avatar-grid"></div>
+  </div>
+  <div class="menu-section" id="name-section">
+    <div class="menu-label">YE NAME (OPTIONAL)</div>
+    <input class="player-input" id="player-name" maxlength="14" placeholder="LEAVE BLANK FOR DEFAULT">
+  </div>
+  <div class="menu-section">
+    <button class="btn ghost small" id="btn-back">⟵ BACK</button>
+    <button class="btn" id="btn-start" disabled>SET SAIL</button>
+  </div>
+</div>
+<div id="gameover-overlay" class="hidden">
+  <div class="go-stack">
+    <div class="go-label">VICTORY</div>
+    <div class="go-name" id="go-winner">???</div>
+    <canvas id="go-portrait" width="16" height="16"></canvas>
+    <div class="go-actions">
+      <button class="btn small" id="btn-play-again">PLAY AGAIN</button>
+      <button class="btn ghost small" id="btn-back-title">⟵ TITLE</button>
+    </div>
+  </div>
+</div>
+<div id="curtain" class="hidden">
+  <div class="curtain-label">PASS THE CUP TO</div>
+  <div class="curtain-name" id="curtain-name">CAPTAIN</div>
+  <canvas id="curtain-portrait" width="16" height="16"></canvas>
+  <div class="curtain-label" id="curtain-bid"></div>
+  <div class="curtain-tap">▼ TAP TO REVEAL DICE ▼</div>
+</div>
+<div id="toast"></div>
+
+<script>
+//=================================================================
+// LIAR'S DICE — Dead Man's Chest edition (v2: zoomed battle scene)
+//=================================================================
+
+const PAL = {
+  '.': null,
+  'k': '#000000', 'K': '#0a0604',
+  'w': '#f4e8c8', 'W': '#ffffff',
+  'g': '#80c040', 'G': '#3a6a20',
+  'r': '#c83020', 'R': '#6a1010',
+  'y': '#f4d27a', 'Y': '#c89860', 'B': '#6a4020', 'b': '#4a3010',
+  'o': '#f48030', 'O': '#a04018',
+  's': '#a8a8a8', 'S': '#606060',
+  'p': '#d878a8', 'P': '#8a4060',
+  't': '#80c0d0', 'T': '#3060a0',
+  'n': '#2a1a08',
+  'u': '#604838',
+  'd': '#1a1004',
+  'l': '#f8f0d0',
+  'L': '#c89868',
+  'm': '#604030',
+  'q': '#80a0c0',
+  'Q': '#406080',
+  'x': '#f0d040',
+  'X': '#a07020',
+  'z': '#205040',
+  'Z': '#103020',
+  'e': '#ff4020',
+  'i': '#ffff80',
+  'j': '#80ffe0',
+  'h': '#ffb8d8', 'H': '#e080a0',
+  '8': '#0a2860', '9': '#1a4090',
+  '7': '#fff8d8',
+  'f': '#ff4000',
+  'F': '#ffa040',
+  '1': '#603018',
+  '0': '#a07028',
+  '2': '#4a1810',
+  '3': '#a04040',
+  '5': '#403028',
+  '6': '#806858',
+  'V': '#ffffff',
+  'N': '#0a0604',
+  'A': '#5a2080',
+  'a': '#7a30a0',
+  'C': '#fdb927',
+  'c': '#d09010',
+  'M': '#cc2a36',
+  '$': '#a01828',
+};
+
+function drawSprite(ctx, sprite, x, y, scale=1) {
+  const lines = sprite.trim().split('\n').map(l => l.trim());
+  for (let row = 0; row < lines.length; row++) {
+    const line = lines[row];
+    for (let col = 0; col < line.length; col++) {
+      const ch = line[col];
+      const color = PAL[ch];
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(x + col*scale, y + row*scale, scale, scale);
+    }
+  }
+}
+
+// Native size of a sprite ASCII string (rows = cols = N for square sprites).
+function spriteNativeSize(sprite) {
+  return sprite.trim().split('\n').length;
+}
+
+// Per-sprite-string cache of pre-rendered canvases at native resolution.
+const _spriteCanvasCache = new Map();
+function ensureSpriteCanvas(sprite) {
+  let c = _spriteCanvasCache.get(sprite);
+  if (c) return c;
+  const size = spriteNativeSize(sprite);
+  c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const cx = c.getContext('2d');
+  cx.imageSmoothingEnabled = false;
+  drawSprite(cx, sprite, 0, 0, 1);
+  c._size = size;
+  _spriteCanvasCache.set(sprite, c);
+  return c;
+}
+
+// Draw a sprite at any pixel display size. Native source resolution is autodetected.
+// Use this instead of drawSprite() when you want a fixed display size and sources may vary (16, 32, ...).
+function drawSpriteAt(ctx, sprite, x, y, displayPx) {
+  const c = ensureSpriteCanvas(sprite);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(c, x, y, displayPx, displayPx);
+}
+
+const PIRATES = [
+  { id: 'davy', name: 'DAVY JONES', trait: 'Calculating', aggro: 0.45, callTreshold: 0.42,
+    sprite: `
+      ................................
+      ................................
+      ................................
+      .......nnnnnnnnnnnnnnnnnn.......
+      ......nnnnnnnnnnnnnnnnnnnn......
+      ......nNNNNNNNNNNNNNNNNNNn......
+      .....nNN0xxxxxxxxxxxxxx0NNn.....
+      .....nNxxxxxxxxxxxxxxxxxxNn.....
+      ......nzzZZZZZZZZZZZZZZzzn......
+      .....zZZZZZZZZZZZZZZZZZZZz......
+      ....zZZkkZZZZZZZZZZeeZZZZZz.....
+      ....zZZkkZZZZZZZZZZeeZZZZZz.....
+      ....zZZZZZZjjjjjjjjZZZZZZZz.....
+      .....zZjjzzzzzzzzzzzzjjZz.......
+      ....zZjjzZZZZZZZZZZZZzzjjZz.....
+      ....zZjzZjjjjjjjjjjjjjzzjZz.....
+      ....zZjzZjjjzzzzzzzzjjjzjZz.....
+      ....zZjzZjzzZZZZZZZzzzjzjZz.....
+      ....zZjjzZzzZjjjjjjzzzZjjZz.....
+      .....zZjjzZzzZjjjjjzzZjjZz......
+      ......zZjjjzZZjjjjjZZjjjZz......
+      .......zzZZjjjjjjjjjjZZzz.......
+      ........zzZZZZjjjjZZZZzz........
+      .........zzzZZZZZZZZzzz.........
+      .........nNNNBBBBBBNNNn.........
+      ........nNN0xxxxxxxx0NNn........
+      ........nN555555555555NN........
+      ........nN000xxxxxx000Nn........
+      ........nbB5555555555Bbn........
+      .........nbnnnnnnnnnnbn.........
+      ................................
+      ................................
+    `},
+  { id: 'bootstrap', name: 'BOOTSTRAP', trait: 'Cautious', aggro: 0.25, callTreshold: 0.32,
+    sprite: `
+      ................................
+      ................................
+      ................................
+      .........qqqqqqqqqqqqqq.........
+      ........qqQqQqQqQqQqQqqq........
+      .......qQQQQQQQQQQQQQQQQq.......
+      .......qQQllllllllllllQQq.......
+      ......qQQlllllllllllllllQQ......
+      ......qQllllellLLLLeellllQQ.....
+      ......qQllllellLLLLeellllQQ.....
+      ......qQlllllllllLllololllQ.....
+      ......qQlllnnllllLllOlOlllQ.....
+      ......qQllllllllllllololllQ.....
+      ......qQlllwmmmmwlllllllllQ.....
+      ......qQllllwmmwwlllllllllQ.....
+      .......qQllllllllllllllllQ......
+      ........qQQllllllllllllQQ.......
+      .......nzZQllllllllllZzn........
+      ......zZQQQllllllllQQQQzz.......
+      .....zZGGGZZllllllZZGGGZZz......
+      .....zZGGGzGZZllZZGzGGGGZz......
+      .....zZGyzGyzZZllZZyzGyGGZz.....
+      ....zZGyxxyxGGGGGGxyxxyGZz......
+      ....zZGyxGyxGGGGGGxyGxyGZz......
+      ....zZGGyGGGGGGGGGGGGyGGZz......
+      .....zZGGGGGGGGGGGGGGGGZz.......
+      ......zZGGGGGGGGGGGGGGZz........
+      .......zZGGGGGGGGGGGGZz.........
+      ........nnnnnnnnnnnnnnn.........
+      .......nbbbbbbbbbbbbbbbn........
+      .......nbnnnnnnnnnnnnnbn........
+      ................................
+    `},
+  { id: 'maccus', name: 'MACCUS', trait: 'Aggressive', aggro: 0.78, callTreshold: 0.55,
+    sprite: `
+      ................................
+      ................................
+      ................................
+      sSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSs
+      seSSSSSSSSSSSSSSSSSSSSSSSSSSSSes
+      .sSSSwwwwwwwwwwwwwwwwwwwwwwSSs..
+      .sSSSSSSSSSSSSSSSSSSSSSSSSSSSs..
+      ..sSSSSSSSSSSSSSSSSSSSSSSSSSs...
+      ...sSSSSSSSSSSSSSSSSSSSSSSSs....
+      ....sSSnnnnnnnnnnnnnnnnnnSSs....
+      ....sSSWWWWWWWWWWWWWWWWWWSSs....
+      ....sSSWnnnnnnnnnnnnnnnnWSSs....
+      ....sSSWnnWWnnWWWnnnWWnnWSSs....
+      ....sSSWnnWWnnnWnnnWWnnnWSSs....
+      .....sSSWWWnWWWnWWWnWWWnSSs.....
+      .....sSSSSSSSSSSSSSSSSSSSs......
+      ......sSSSSSSSSSSSSSSSSSs.......
+      .......sSSSSSSSSSSSSSSSs........
+      ........sSSSSSSSSSSSSSs.........
+      ........nnnnnnnnnnnnnn..........
+      .......nB55555555555555n........
+      ......nB5555xxxxxx55555Bn.......
+      .....nBB5xxxxxxxxxxxx5BBn.......
+      .....nBB55xxxxxxxxxx55BBn.......
+      .....nBBB5555555555555BBn.......
+      .....nBBB5555555555555BBn.......
+      ......nbnnnnnnnnnnnnnnbn........
+      .......nbnnnnnnnnnnnnbn.........
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'koleniko', name: 'KOLENIKO', trait: 'Chaotic', aggro: 0.65, callTreshold: 0.50,
+    sprite: `
+      ................................
+      ................................
+      .........zzzzzzzzzzzz...........
+      ........zzZZZZZZZZZZZzz.........
+      .......zZZZZZZZZZZZZZZZz........
+      ......zZZjjjjjjjjjjjjjZZz.......
+      .....zZZjjjjjjjjjjjjjjjZZz......
+      ....zZZjeZjjjjjjjjjjZeZjZZz.....
+      ....zZjjeZjjjjjjjjjjjZeZjZz.....
+      ....zZZjjjjjjjjjjjjjjjjjjZz.....
+      ....zZjjjjjjjjjjjjjjjjjjjZz.....
+      ....zZjjjjjjjnnnnjjjjjjjjjz.....
+      ....zZjjjjjwmwmwmwjjjjjjjZz.....
+      ....zZjjjjjjwmmmwjjjjjjjjZz.....
+      ....zZjjjjjjjjjjjjjjjjjjjZz.....
+      .....zZjjjjjjjjjjjjjjjjZZz......
+      ......zZZjjjjjjjjjjjjjZZz.......
+      .......zZZjjjjjjjjjjZZZz........
+      ........zzZZZZZZZZZZZzz.........
+      .........zzZZZZZZZZZzz..........
+      ..........zzzzzzzzzzz...........
+      ............zzzzzzz.............
+      .............bbbbbb.............
+      ............bBBBBBBb............
+      ...........bBBBBBBBBb...........
+      ..........bBBBBBBBBBBb..........
+      ..........bBBBBBBBBBBb..........
+      ...........bBBBBBBBBb...........
+      ............bbbbbbbb............
+      .............bnnnnb.............
+      ................................
+      ................................
+    `},
+  { id: 'pegleg', name: 'OLD PEGLEG', trait: 'Bluffer', aggro: 0.70, callTreshold: 0.40,
+    sprite: `
+      ................................
+      ................................
+      .......nnnnnnnnnnnnnnnn.........
+      ......nNNNNNNNNNNNNNNNNN........
+      ......nN0xxxxxxxxxxxxx0Nn.......
+      .....nNNxxxxxxxxxxxxxxxNNn......
+      .....nNxxxxxxxxxxxxxxxxxNn......
+      ......lllllLLLLLLLLLlllll.......
+      .....llLkkkkkkLLLLLLLLLLLll.....
+      .....lLLkkkkkkLLLLLLeLLLLLl.....
+      .....lLLkkkkkkLLLLLLLLLLLLl.....
+      .....lLLLLLLLLLLnnnnLLLLLLl.....
+      .....lLLLLLwmmmmmmmmwLLLLll.....
+      ......nllwwwwwwwwwwwwwwlln......
+      ......nnllllllllllllllnn........
+      .....rRRRRRRRRRRRRRRRRRRr.......
+      ....rRR0xxxxxxxxxxxxxx0RRr......
+      ....rRRRRRRRRRRRRRRRRRRRRR......
+      ....rRR000000000000000000R......
+      ....rRRRRRRRRRRRRRRRRRRRRR......
+      .....nnnnnnnnnnnnnnnnnn.........
+      ......555555555555555...........
+      ......555555555555555...........
+      ......nnnnnnnnnnnnnn............
+      .......nbnbnbnB...n.............
+      .......nbnnnnnB...n.............
+      ........bbnnnnB....n............
+      .........nnnnnB.................
+      ..........nnnnn.................
+      ................................
+      ................................
+      ................................
+    `},
+
+  { id: 'blackbeard', name: 'BLACKBEARD', trait: 'Ruthless', aggro: 0.85, callTreshold: 0.55,
+    sprite: `
+      ................................
+      ................................
+      ................................
+      ........nnnnnnnnnnnnnnnn........
+      .......nnnnnnnnnnnnnnnnnn.......
+      ......nNNNNNNNNNNNNNNNNNNn......
+      .....nNN0xxxxxxxxxxxxxx0NNn.....
+      .....nNxxxxxxxxxxxxxxxxxxNn.....
+      ......nllllllllllllllllllln.....
+      .....llllllllllllllllllllll.....
+      ....llLLLLLLLLLLLLLLLLLLLLLll...
+      ....lLLeeLLLLLLLLLLLLLeeLLll....
+      ....lLLLLLLLLLnnLLLLLLLLLLll....
+      ....lLLLLLLLLwmmwLLLLLLLLLll....
+      ....llkkkkkkkkkkkkkkkkkkkkkk....
+      ...kkkkkkkkkfFkkkkffkkkkkkkkk...
+      ..kkkkkkkkkffFkkfFffkkkkkkkkk...
+      .7.kkkkkkkffFkkkkkkffkkkkkkk.7..
+      .77kkkkkkkkkkkkkkkkkkkkkkk.77...
+      .7..kkkkkkkkkkkkkkkkkkkkkk..7...
+      .7..nnnnnnnnnnnnnnnnnnnnnn..7...
+      .....nB5555555555555555555n.....
+      ....nB000000000000000000000n....
+      ....nB55555555555555555555Bn....
+      ....nB000000000000000000000n....
+      ....nbB5555555555555555555Bn....
+      .....nbnnnnnnnnnnnnnnnnnnbn.....
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'jack', name: 'JACK SPARROW', trait: 'Trickster', aggro: 0.60, callTreshold: 0.38,
+    sprite: `
+      ................................
+      ................................
+      .........rrrrrrrrrrrrrr.........
+      ........rrwrrwrrwrrwrrwr........
+      ........rRRRRRRRRRRRRRrr........
+      .......nnnLLLLLLLLLLLnnnn.......
+      ......nnLLLLLLLLLLLLLLLLnn......
+      ......nLkkkLeeeeeekkkLLLn.......
+      ......nLkkkLLLLLLeekkkLLn.......
+      ......nLLLLLLLLnnLLLLLLLn.......
+      ......nLLLLLnwwnnLLLLLLLn.......
+      ......nnLLLLLwwwLLLLLLnnn.......
+      .......nnLLLwwwwwLLLLnn.........
+      ........nLLnxnxnxnxnLn..........
+      ........nLnnxnxxxnnnnLn.........
+      .........nnnxnxxxxnnnn..........
+      .........nnnxnxxxnnnn...........
+      ..........nnnnnnnnnn............
+      .........2222222y2y2222.........
+      ........222222y22y22222.........
+      ........22226y2y22662222........
+      .......2222266y2266622222.......
+      ......2226666y2y26666622222.....
+      ......222266622y22266622222.....
+      ......222226622y2266662222......
+      ......22226662y226666222222.....
+      ......2222266y2266662222226.....
+      .......22266y22266622222262.....
+      ........22yy22266662222226......
+      ........nnnnnnnnnnnnnnnn........
+      ................................
+      ................................
+    `},
+  { id: 'anne', name: 'ANNE BONNY', trait: 'Fierce', aggro: 0.78, callTreshold: 0.50,
+    sprite: `
+      ................................
+      .........rrrrrrrrrrrr...........
+      ........rrRRrrRRrrRRrr..........
+      .......rrRRRRRRRRRRRRRrr........
+      .......rrwwwwwwwwwwwwwrr........
+      ......rrwLLLLLLLLLLLLLLwRR......
+      ......rwLLeLLLLLLLLLLeLLwRR.....
+      ......rwLLLLLLLLnnLLLLLLLwRR....
+      ......rwLLLLLLwwmmwwLLLLLwRR....
+      ......rwLLLLLwmmmmmmmmwLLwR.....
+      .......RRrLwwwwwwwwwwwwrRR......
+      ........RRrwwwwwwwwwwrRR........
+      ........nnYYbbbbbbYYnn..........
+      .......nBYYYYYYYYYYYYBn.........
+      ......nBBYYbbbbbbbbYYBBn........
+      ......nBBYYbBYYYYYYbBYBBn.......
+      ......nBBYYBBYYYYYYBBBBn........
+      .......nBYYYYYYYYYYYYBn.........
+      ......nbbnxxxxxxxxnbbnn.........
+      ......nbnnxxxxxxxxnnnbn.........
+      .......nnnnnnnnnnnnnnn..........
+      ......nbbbbbbbbbbbbbbbn.........
+      ......nbnnnnnnnnnnnnnbn.........
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'calico', name: 'CALICO JACK', trait: 'Showman', aggro: 0.55, callTreshold: 0.45,
+    sprite: `
+      ................................
+      ................................
+      ........nnnnnnnnnnnnnnnnnn......
+      .......nNNNNNNNNNNNNNNNNNNNn....
+      ......nN0xxxxxxxxxxxxxxxxx0Nn...
+      .....nNNxxxxxxxxxxxxxxxxxxxNNn..
+      .....nNxxxxxxxxxxxxxxxxxxxxxN...
+      .......lllllLLLLLLLLLlllll......
+      ......lllLLLLeLLLLLLeLLLLlll....
+      ......llLLLLLLLnnnnLLLLLLLll....
+      ......llLLLLLwmmmmmmwLLLLLll....
+      ......nnllllllwwwwwwlllllllnn...
+      ......nnnnnnnnnnnnnnnnnnnnnn....
+      .....rWrWrWrWrWrWrWrWrWrWrW.....
+      ....rWrWrWrWrWrWrWrWrWrWrWrW....
+      ....WrWrWrWrWrWrWrWrWrWrWrWr....
+      ....rWrWrWrWrWrWrWrWrWrWrWrW....
+      ....WrWrWrWrWrWrWrWrWrWrWrWr....
+      ....rWrWrWrWrWrWrWrWrWrWrWrW....
+      ....nnYYnnnnnnnnnnnnnnnnYYnn....
+      .....bBBBBBBBBBBBBBBBBBBBb......
+      .....nbbbbbbbbbbbbbbbbbbbn......
+      ......nnnnnnnnnnnnnnnnnnn.......
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'morgan', name: 'HENRY MORGAN', trait: 'Tactician', aggro: 0.40, callTreshold: 0.35,
+    sprite: `
+      ................................
+      .....r..........................
+      .....rr.........................
+      .....rrr....nnnnnnnnnnnnnnnn....
+      .....rrrr..nnnnnnnnnnnnnnnnnnn..
+      ......RrrnnNNNNNNNNNNNNNNNNNNNn.
+      .......RrnNN0xxxxxxxxxxxxxx0NNn.
+      ........nNNxxxxxxxxxxxxxxxxxxNn.
+      ........nNxx00xx00xx00xx00xxxNn.
+      .........llllLLLLLLLLLLLLLLll...
+      ........lLLLLLeLLLLLLLLLeLLLll..
+      ........lLLLLLLLLLLnnnnLLLLLLll.
+      ........lLLLLLLLwmmmmmmmwLLLLll.
+      ........nnnnllllllwwwwwlllllnnn.
+      ........NNN0xxxxxxxxxxxxxx0NNN..
+      .......t0xxxxxxxxxxxxxxxxxxxx0t.
+      .......t00xxxxxxxxxxxxxxxxxxx0t.
+      ......tt0xxxxxxxxxxxxxxxxxxxx0t.
+      ......ttxxxxxxxxxxxxxxxxxxxxxtt.
+      ......ttxxxxxxxxxxxxxxxxxxxxxtt.
+      ......ttxxttxxttxxttxxttxxxxtt..
+      ......nnnnnnnNNnnnnnNNnnnnnnnn..
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'kidd', name: 'CAPT. KIDD', trait: 'Cautious', aggro: 0.30, callTreshold: 0.32,
+    sprite: `
+      ................................
+      ................................
+      ........kkkkkkkkkkkkkk..........
+      .......kkkkkkkkkkkkkkkkk........
+      ......kkkkkkkkkkkkkkkkkkk.......
+      .....kkkkkkkkkkkkkkkkkkkkk......
+      ....nnllllLLLLLLLLLLLLll........
+      ....nllLLLLLeLLLLLLeLLLll.......
+      ....nlllLLLLLLnnnnLLLLLLll......
+      ....nlllLLLLLwwmmmmwwLLLLll.....
+      ....nlllssssssssssssssll........
+      ....nlllssssssssssssssssll......
+      ....nnllssssssssssssssssll......
+      ....nnssssssssssssssssssss......
+      ....nnnssssssssssssssssss.......
+      ....nN555555555555555555N.......
+      ....nN555555555555555555N.......
+      ....nN555555555555555555N.......
+      ....nN555555555555555555N.......
+      ....nN555555555555555555N.......
+      ....nbnnnnnnnnnnnnnnnnbn........
+      ....nbnnnnnnnnnnnnnnnnbn........
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'silver', name: 'LONG JOHN SILVER', trait: 'Crafty', aggro: 0.55, callTreshold: 0.42,
+    sprite: `
+      ................................
+      ................................
+      .......nnnnnnnnnnnnnnnn.........
+      ......nNN0xxxxxxxxxxxx0NNn......
+      .....nNNxxxxxxxxxxxxxxxxxNn.....
+      .....nNxxxxxxxxxxxxxxxxxxxN.....
+      ........lllllLLLLLLLLll.........
+      .......lllLLLLLeLLLLeLLLll......
+      .......llLLLLLLLLnnLLLLLLll.....
+      .......llLLLLLwmmmmwwwLLLLl.....
+      .......nnssssssssssssssssnn.....
+      ......sSsSsSsSsSsSsSsSsSsSGg....
+      ......nNNNNNNNNNNNNNNNNNNGgr....
+      ......nN555555555555555555NGr...
+      ......nN5555555xxxxxx555555N....
+      ......nN5555555555555555555N....
+      ......nN5555555555555555555N....
+      ......nN5555555555555555555N....
+      ......nbbbbbbbbbnnnnbbbbbbbn....
+      .......nnnnnnnnn....nnnnnnn.....
+      ........bnnnbn........nbnb......
+      ........bnnnb..........BBB......
+      .......bbnbn............BBB.....
+      ........nnn..............B......
+      .........................B......
+      .........................B......
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+];
+
+const AVATARS = [
+  { id: 'hook', name: 'CAPTAIN HOOK', tag: 'NEMESIS OF PAN',
+    sprite: `
+      ................................
+      ................................
+      .....r..........................
+      .....rr.........................
+      .....rrr...nnnnnnnnnnnnnnn......
+      .....rrrnnnnnnnnnnnnnnnnnn......
+      ......nnnNNNNNNNNNNNNNNNNNn.....
+      ......nNN0xxxxxxxxxxxxx0NNn.....
+      ......nNxxxxxxxxxxxxxxxxxNn.....
+      .....nkkkkkkkkkkkkkkkkkkkn......
+      ....kkkLLLLLLLLLLLLLLLLLkkk.....
+      ....kkLLeeLLLLLLLLLLeeLLkkk.....
+      ....kkLLLLLLLLnnnnLLLLLLkk......
+      ....kkLLLwmmmmmmmmmmwLLLkk......
+      ....kkLLwwwwwwwwwwwwwwLLkk......
+      .....kknlllllllllllllllnkk......
+      ......nnllllllllllllllnnk.......
+      ....rRRRRRRRRRRRRRRRRRRRRR......
+      ....rRR0xxxxxxxxxxxxxx0RRr......
+      ....rRRRRRRRRRRRRRRRRRRRRRR.....
+      ....rRR00000000000000000RRr.....
+      ....rRRRRRRRRRRRRRRRRRRRRRR.....
+      ....bbbbbbbbbbbbbbbb...sSSs.....
+      ....bbbbbbbbbbbbbbb...sSsss.....
+      .....nnnnnnnnnnnn....sSsss......
+      .....................SSSss......
+      ......................SSss......
+      .......................SSs......
+      .......................SSss.....
+      .......................sSSs.....
+      ........................SSs.....
+      .........................S......
+    `},
+  { id: 'luffy', name: 'M. D. LUFFY', tag: 'STRAW HAT KING',
+    sprite: `
+      ................................
+      ................................
+      ........yyyyyyyyyyyyyyyy........
+      .......yyyyyyyyyyyyyyyyyy.......
+      ......yyyyyyyyyyyyyyyyyyyy......
+      .....yyyyyyyyyyyyyyyyyyyyyy.....
+      ....yyyyyy333333333333yyyyyy....
+      ....yyyyyy3yyyyyyyyy3yyyyyy.....
+      .....yyyyyyyyyyyyyyyyyyyyyy.....
+      ........llLLLLLLLLLLLLLll.......
+      ........lLLLeeLLLLLLeeLLll......
+      ........lLLeeellLLLLLLLLll......
+      ........lLLeeellLLnnnnLLLl......
+      ........lLLLLLLLLnnnnLLLLl......
+      ........lLwwwwwwwwwwwwwwLl......
+      ........lLLwWWWWWWWWWWwLLl......
+      ........lLLwwwwwwwwwwwLLl.......
+      .........llllllllllllllll.......
+      ........33333333333333333.......
+      .......3333333333333333333......
+      ......333333333333333333333.....
+      ......333333333333333333333.....
+      ......333333333333333333333.....
+      .......nnnnnnnnnnnnnnnnnnn......
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'kenway', name: 'EDWARD KENWAY', tag: 'ASSASSIN OF NASSAU',
+    sprite: `
+      ................................
+      ................................
+      ..............WWWW..............
+      ............WwWWWWWw............
+      ..........WWWWwwwwwwWW..........
+      ........WWWWWWWWWWWWWWWw........
+      .......WWWWWWWWWWWWWWWWWw.......
+      ......wWWWLLLLLLLLLLLwwwww......
+      .....wwWLLeeeLLLLLLeeeLLwww.....
+      .....wwLLLLLLLLLnnLLLLLLwww.....
+      .....wwLLLLLwmmmmmmwLLLLww......
+      .....wwLLLwmmmmmmmmmmwLLww......
+      ......wwwwwwwwwwwwwwwwwww.......
+      ......rrr99999999999999rrr......
+      .....rrr8888888888888888rrr.....
+      ....rrrr88888888888888888rrr....
+      ....2222999999999999999992222...
+      ....2222999999999999999992222...
+      ....2222999999999999999992222...
+      ....2222999999999999999992222...
+      ....bbb0000000000000000000bbb...
+      ....nnnnnnnnnnnnnnnnnnnnnnnn....
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'kirby', name: 'KIRBY', tag: 'PINK PUFF PIRATE',
+    sprite: `
+      ................................
+      ................................
+      ..........hhhhhhHHhh............
+      ........hhhhhhhhHHHHhh..........
+      .......hhhhhhhhhhHHHHhh.........
+      ......hhhhhhhhhhhhHHHHhh........
+      .....hhhhhhhhhhhhhhHHHHhh.......
+      ....hhhhhhhhhhhhhhhhHHHHhh......
+      ....hhhhhhwwhhhhhhhwwhHHHhh.....
+      ....hhhhhwkkhhhhhhwkkhHHHhh.....
+      ....hhhhhwkkhhhhhhwkkhHHHhh.....
+      ....hhhhhhwwhhhhhhhwwhHHHhh.....
+      ....hhhhhhhhhhwwhhhhhhHHHhh.....
+      ....hhhhhhhhhwwwwhhhhhHHHhh.....
+      ....hhhhhhhhhhwwhhhhhhHHHhh.....
+      ....HHhhhhhhhhhhhhhhhHHHHhh.....
+      ....HHHhhhhhhhhhhhhhhHHHHHh.....
+      ....HHHhhhhhhhhhhhhhhHHHHHh.....
+      .....HHHHhhhhhhhhhhhHHHHHH......
+      ......HHHHHhhhhhhhhHHHHHH.......
+      ........HHHHHHHHHHHHHHHH........
+      ..........HHHHHHHHHHHH..........
+      .........rrrrrrrrrrrr...........
+      ........rRRrrRRrrRRRrr..........
+      ........rRRRRRRRRRRrrr..........
+      ........rrrrrrrrrrrrr...........
+      .........nnnnnnnnnnn............
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'peyton', name: 'P. MANNING', tag: 'OMAHA, OMAHA',
+    sprite: `
+      ................................
+      ................................
+      ........888888888888888.........
+      .......88899999999999988........
+      ......88999977777777999888......
+      .....8899977777777777779988.....
+      ....889999wwwwwwwwwww999988.....
+      ....88997wwww9999999www7988.....
+      ....8897w99999999999999w7988....
+      ....889ww9999999999999ww98......
+      ....8899llleeellleellll998......
+      ....8899lllllllnnnnllll998......
+      ....8899lllllwmmmmmwllll998.....
+      ....88999llllwwwwwwlllll988.....
+      ....8899999llllllllll9999988....
+      ....88999999999999999999988.....
+      .....889999999999999999988......
+      ......VVVVVVVVVVVVVVVVVV........
+      ......V7777777777777777V........
+      ......V7777881888777777V........
+      ......V7777888888777777V........
+      ......VVVVVVVVVVVVVVVVVV........
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'naruto', name: 'NARUTO', tag: 'BELIEVE IT',
+    sprite: `
+      ................................
+      ................................
+      ........yyyyyyyyyyyyyy..........
+      .......yy00yyyy00yyyy00.........
+      ......yy0000yy0000yy0000........
+      .....yyyyyyyyyyyyyyyyyyyy.......
+      .....yyyyy999999999999yyyy......
+      .....yyyyy755555557555yyyy......
+      ......lllllllllllllllllll.......
+      .....llLLLLLeLLLLLLLeLLLll......
+      .....llLLLLLLLLnnnnLLLLLLll.....
+      .....nnllllllllllllllllllnn.....
+      .....nnnllllllllllllllllnnn.....
+      .....llllllwwwwwwwwwwwLllll.....
+      .....llnnnllllllllllllllnln.....
+      ......nnnllllllllllllnnn........
+      .......nnnnnnnnnnnnnnnn.........
+      ......oOoOoOoOoOoOoOoOoO........
+      .....oooo777oo77oo777oooo.......
+      ....oooo777777777777777ooo......
+      ....oo7777777777777777777oo.....
+      ....ooo777777777777777777oo.....
+      ....oooo7777777777777777oo......
+      ....nbbnnnnnnnnnnnnnnnnbbn......
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'invincible', name: 'INVINCIBLE', tag: 'THINK, MARK',
+    sprite: `
+      ................................
+      ................................
+      ........nnnnnnnnnnnnnnnn........
+      .......nnNNNNNNNNNNNNNNn........
+      ......nnNNNNNNNNNNNNNNNnnn......
+      .....nnNNNNNNNNNNNNNNNNNNnnn....
+      ......888888888888888888888.....
+      .....88CCCCCCCCCCCCCCCCCC88.....
+      ....8CCCC8888888888888CCCC88....
+      ....8CCC8CCCCCCCCCC8CCCCCC88....
+      ....88888888888888888888888.....
+      ....88888888888888888888888.....
+      ....8888wmmmmmmmwwww888888......
+      .....88wwwwwwwwwwwwww8888.......
+      ......lllllllllllllllll.........
+      .....yyyyyyyyyyyyyyyyyyy........
+      ....y8888888888888888888y.......
+      ....y8yyyy888888888yyyy8y.......
+      ....y8yyyy888888888yyyy8y.......
+      ....yyy88888888888888yyyy.......
+      ....yyy88888888888888yyy........
+      ....yyyyyyyyyyyyyyyyyyy.........
+      ....yyyyyyyyyyyyyyyyyy..........
+      ....nyyyyyyyyyyyyyyyyn..........
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'kratos', name: 'KRATOS', tag: 'GHOST OF SPARTA',
+    sprite: `
+      ................................
+      ................................
+      ........llllllllllllllll........
+      .......wwwwwwwwwwwwwwwwww.......
+      ......wwwwwwwMMwwwwwwwwwww......
+      ......wwwwwwwMMMwwwwwwwwww......
+      ......wwwwwwwwMMMwwwwwwwww......
+      ......wwwwwwwwwMMlwwwwwwww......
+      ......wwwwwweeMllleeewwwww......
+      ......wwwwwwwMnnnnnwwwwwww......
+      ......wwwwwwlMllmmwwwwwwww......
+      ......wwwwwlllwmmwwwwwwwww......
+      ......wwwwlllwwwwwwwwwwwww......
+      ........ssssssssssssssss........
+      .........sssssssssssssss........
+      ........nnnnnnnnnnnnnnnn........
+      .......MMMMMMMMMMMMMMMMMM.......
+      ......MMMMMMMMMMMMMMMMMMMM......
+      .....MMMMMMMMMMMMMMMMMMMMMM.....
+      .....nXXXXXXXXXXXXXXXXXXXXn.....
+      .....nXX0000000000000000XXn.....
+      .....nbbbbbbbbbbbbbbbbbbbbn.....
+      .....nbnnnnnnnnnnnnnnnnnnbn.....
+      .....nnnnnnnnnnnnnnnnnnnnnn.....
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'mario', name: 'MARIO', tag: "IT'S-A ME",
+    sprite: `
+      ................................
+      ................................
+      ........MMMMMMMMMMMMMMMM........
+      .......MMMMMMMMMMMMMMMMMM.......
+      ......MMMMMMwwwMwwwMMMMMMM......
+      ......MMMMMwMMMwMMwMMMMMMM......
+      ......MMMMMwMMMMwMwMMMMMMM......
+      ......MMMMMMMMMMMMMMMMMMMM......
+      ......nnllLLLLLLLLLLLLLLnn......
+      ......nllLLLLLLLLLLLLLLLLn......
+      ......nllLLeeLLLLLLLLeeLLn......
+      ......nllLLLLLLLnnnnLLLLLn......
+      ......nlwwwwwwmmmmmmwwwwLn......
+      ......nllwwmmmmmmmmmmwwLLn......
+      ......nllLwwwwwwwwwwwwLLLn......
+      ......nnllLLLnnnnnnLLLLLnn......
+      ......nnllLLLLLLLLLLLLLLnn......
+      ......MMMMMMMMMMMMMMMMMMMM......
+      ......MMMMMMMMMMMMMMMMMMMM......
+      ......9MMMrxrrrrxrrrrxMMM9......
+      ......99MMxxxxxxxxxxxxMM99......
+      ......99MMMMMMMMMMMMMMMM99......
+      ......99MMMMMMMMMMMMMMMM99......
+      ......nbbnnnnnnnnnnnnnbbn.......
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'lebron', name: 'LEBRON', tag: 'KING JAMES',
+    sprite: `
+      ................................
+      ................................
+      ........nnnnnnnnnnnnnnnn........
+      .......nnNNNNNNNNNNNNNNnn.......
+      ......nnnNNNNNNNNNNNNNNNNnn.....
+      ......VVVVVVVVVVVVVVVVVVVV......
+      .....AAAAAAAAAAAAAAAAAAAAAA.....
+      .....mmLLLLLLLLLLLLLLLLLLmm.....
+      .....mLLLLeeLLLLLLLLeeLLLm......
+      .....mLLLLLLLLLLnnLLLLLLLm......
+      .....mLLLLLLLwmmmmmmwLLLLm......
+      .....mmnnLLwwwwwwwwwwLLnnm......
+      .....mmnnnLwwwwwwwwwwLnnnm......
+      .....mmnnnnnnnnnnnnnnnnnnn......
+      ......AAAAAAAAAAAAAAAAAAAA......
+      .....AAaaCCCCCC22CCCCCCaaAA.....
+      .....AAaaCCCCCC33CCCCCCaaAA.....
+      .....AAaaaaaaaaaaaaaaaaaAAA.....
+      .....AAAAAAAAAAAAAAAAAAAAAA.....
+      .....AAAACCCCCCCCCCCCCCAAAA.....
+      .....mmAAAAAAAAAAAAAAAAAmm......
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'thragg', name: 'THRAGG', tag: 'VILTRUMITE LORD',
+    sprite: `
+      ................................
+      ................................
+      ........kkkkkkkkkkkkkkkk........
+      .......kkkkkkkkkkkkkkkkkk.......
+      ......kkkkkkkkkkkkkkkkkkkk......
+      ......kkkkkkkkkkkkkkkkkkkk......
+      ........llLLLLLLLLLLLLLll.......
+      ........lLLLeeLLLLLLeeLLll......
+      ........lLLLLLLLLLnnLLLLLl......
+      ........lLLLLkkkkkkkkkkLLl......
+      ........lLLLkkkkkkkkkkkLLl......
+      ........nnllllllllllllllnn......
+      ........nlllllllllllllllnn......
+      ......wWwWwWwWwWwWwWwWwWwW......
+      .....wWWwWWwWWwWWwWWwWWwWWw.....
+      ....wWWWwWWWwWWWwWWWwWWWwWWw....
+      ....wWWWwWWWwWWWwWWWwWWWwWWw....
+      ....rrrrrrrrrrrrrrrrrrrrrrrr....
+      ....rrrrrrrrrCCCCCCCCrrrrrrr....
+      ....rrrrrrrrCccccccccCrrrrrr....
+      ....rrrrrrrrCcccccccccCrrrrr....
+      ....rrrrrrrrrCccccccccCrrrrr....
+      ....rrrrrrrrrrCCCCCCCCrrrrrr....
+      ....rrrrrrrrrrrrrrrrrrrrrrr.....
+      ....sssssssssssssssssssssssss...
+      ....sssssssssssssssssssssssss...
+      ....rrrrrrrrrrrrrrrrrrrrrrrr....
+      ....rrrrrrrrrrrrrrrrrrrrrrr.....
+      ....rrrrrrrrrrrrrrrrrrrrrr......
+      ................................
+      ................................
+      ................................
+    `},
+  { id: 'battlebeast', name: 'BATTLE BEAST', tag: 'BLOODSPORT KING',
+    sprite: `
+      ................................
+      .........................000....
+      ........................00000...
+      .......WWWWWWWWWWWWww...0000....
+      .....WWWWWWWWWWWWWWWWww0000.....
+      ....wWWWWWWWWWWWWWWWWWW0xx......
+      ...wwWWLLLLLLLLLLLLLwwwwxxx.....
+      ..wwWWLLeeeeeeeeeeeLLwww.xxx....
+      ..wWLLLLLLLLNNNNLLLLLLww........
+      ..wLLLLLLwWWWWWWWWwLLLLww.......
+      ..wLLLLLwWWWWWWWWWWwLLLww.......
+      ..wwwwLwwLwwwLwwwLwwwLwww.......
+      ...wwwwwwwwwwwwwwwwwwww.........
+      ...wWWWWWWWWWWWWWWWWWww.........
+      ..wWWWWWWWWWWWWWWWWWWWWw........
+      ....nnnnnnnnnnnnnnnnnnn.........
+      ...rrnkkkkkkkkkkkkkkkknrr.......
+      ...rkkkkkkkkkkkkkkkkkkkkrr......
+      ..rrkkkkkkkkkkkkkkkkkkkkkrr.....
+      ..rrkkkkkkkkkkkkkkkkkkkkkrr.....
+      ..rrkkkkkkkkkkkkkkkkkkkkkrr.....
+      ..rrr0xxxxxxxxxxxxxxxxxx0rrr....
+      ..rrr00000000000000000000rrr....
+      ..rrrrrrrrrrrrrrrrrrrrrrrrrr....
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+      ................................
+    `},
+];
+
+//----------------------------------------------------------------
+// SCENE — Davy Jones cabin: tight oval table, looming crew
+//----------------------------------------------------------------
+const SCENE = (() => {
+  const canvas = document.getElementById('scene');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const W = canvas.width, H = canvas.height; // 480 x 270
+
+  const rain = [];
+  for (let i = 0; i < 60; i++) rain.push({ x: Math.random()*W, y: Math.random()*H, s: 1+Math.random()*1.5 });
+  let krakenT = 0, lightningT = 0, lightningNext = 4 + Math.random()*8, elapsed = 0;
+  function flash() { lightningT = 0.6; return true; }
+
+  // Layout constants for the play scene
+  // Window/sky region:  y = 0..60   (small slit at top of cabin wall)
+  // Cabin wall:         y = 60..130
+  // Table edge top:     y = 130
+  // Table surface:      y = 130..230  (oval visible area)
+  // Foreground floor:   y = 230..270
+  const TABLE = { cx: W/2, cy: 175, rx: 175, ry: 50 };
+
+  function drawWindow(dt) {
+    elapsed += dt;
+    krakenT += dt;
+    lightningT = Math.max(0, lightningT - dt*1.5);
+    lightningNext -= dt;
+    if (lightningNext <= 0) {
+      flash();
+      lightningNext = 5 + Math.random()*10;
+      if (window.AUDIO) AUDIO.thunder();
+    }
+    // Sky
+    const skyGrad = ctx.createLinearGradient(0,0,0,60);
+    skyGrad.addColorStop(0, '#070712');
+    skyGrad.addColorStop(1, '#141428');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0,0,W,60);
+    // Distant raging ocean
+    for (let x = 0; x < W; x += 2) {
+      const wave = Math.sin(x*0.06 + krakenT*1.2)*2 + Math.sin(x*0.13 + krakenT*0.7)*1.5;
+      ctx.fillStyle = '#0a1424';
+      ctx.fillRect(x, 42 + wave, 2, 18 - wave);
+    }
+    // Kraken tentacle silhouettes
+    for (let i = 0; i < 3; i++) {
+      const baseX = 80 + i*150;
+      ctx.fillStyle = '#091a14';
+      for (let y = 0; y < 40; y++) {
+        const sway = Math.sin(krakenT*1.5 + y*0.18 + i)*6;
+        const w = Math.max(2, 12 - y*0.18);
+        ctx.fillRect(baseX + sway - w/2, 18 + y, w, 1);
+      }
+    }
+    // Lightning flash inside the window slit
+    if (lightningT > 0) {
+      ctx.fillStyle = `rgba(180,200,255,${lightningT*0.55})`;
+      ctx.fillRect(0,0,W,60);
+      if (lightningT > 0.4) {
+        ctx.fillStyle = '#fff';
+        let bx = 60 + Math.random()*(W-120);
+        for (let by = 0; by < 50; by += 3) {
+          ctx.fillRect(bx, by, 2, 4);
+          bx += (Math.random()-0.5)*8;
+        }
+      }
+    }
+    // Rain inside window slit
+    ctx.fillStyle = '#a0b0c0';
+    for (let p of rain) {
+      p.y += 90*dt; p.x -= 30*dt;
+      if (p.y > 60) { p.y = -2; p.x = Math.random()*W; }
+      if (p.x < 0) p.x += W;
+      if (p.y < 60) ctx.fillRect(p.x|0, p.y|0, 1, 2 + (p.s|0));
+    }
+    // Window frame
+    ctx.fillStyle = '#3a2410';
+    ctx.fillRect(0,0,W,4);
+    ctx.fillRect(0,58,W,8);
+    ctx.fillStyle = '#5a3818';
+    ctx.fillRect(0,4,W,2);
+    ctx.fillRect(0,66,W,1);
+    // Window crossbars (vertical)
+    ctx.fillStyle = '#3a2410';
+    for (let x = W/4; x < W; x += W/4) ctx.fillRect(x|0, 0, 3, 60);
+  }
+
+  function drawCabinWall() {
+    // Wall above table
+    for (let py = 66; py < 130; py += 8) {
+      ctx.fillStyle = py % 16 === 66 ? '#3a2410' : '#2a1808';
+      ctx.fillRect(0, py, W, 8);
+      ctx.fillStyle = '#1a1004';
+      ctx.fillRect(0, py+7, W, 1);
+    }
+    ctx.fillStyle = '#1a1004';
+    for (let px = 0; px < W; px += 40) ctx.fillRect(px, 66, 1, 64);
+    // Foreground floor
+    ctx.fillStyle = '#1a0c04';
+    ctx.fillRect(0, 230, W, 40);
+    ctx.fillStyle = '#0a0402';
+    ctx.fillRect(0, 230, W, 2);
+  }
+
+  // Static atmosphere on the wall
+  const wallGrowth = (() => {
+    const items = [];
+    const seed = (n) => { let x = Math.sin(n*9999)*10000; return x - Math.floor(x); };
+    for (let i = 0; i < 60; i++) {
+      items.push({
+        x: Math.floor(seed(i)*W),
+        y: 68 + Math.floor(seed(i+100)*60),
+        kind: seed(i+200) > 0.55 ? 'barnacle' : 'moss',
+        size: 2 + Math.floor(seed(i+300)*2),
+      });
+    }
+    return items;
+  })();
+  function drawWallGrowth() {
+    for (const g of wallGrowth) {
+      if (g.kind === 'barnacle') {
+        ctx.fillStyle = '#3a4030';
+        ctx.fillRect(g.x, g.y, g.size, g.size);
+        ctx.fillStyle = '#5a6048';
+        ctx.fillRect(g.x, g.y, 1, 1);
+      } else {
+        ctx.fillStyle = '#1a2a18';
+        ctx.fillRect(g.x, g.y, g.size+1, 1);
+        ctx.fillStyle = '#0a1a0a';
+        ctx.fillRect(g.x, g.y+1, g.size, 1);
+      }
+    }
+  }
+
+  const bioSpecks = (() => {
+    const items = [];
+    const seed = (n) => { let x = Math.sin(n*7777)*10000; return x - Math.floor(x); };
+    for (let i = 0; i < 30; i++) {
+      items.push({
+        x: Math.floor(seed(i)*W),
+        y: 70 + Math.floor(seed(i+50)*150),
+        phase: seed(i+100)*Math.PI*2,
+        color: seed(i+200) > 0.5 ? '#80ffe0' : '#a0f080',
+      });
+    }
+    return items;
+  })();
+  function drawBioSpecks(t) {
+    for (const s of bioSpecks) {
+      const pulse = 0.4 + Math.sin(t*1.2 + s.phase)*0.6;
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = s.color;
+      ctx.fillRect(s.x, s.y, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Static encrustation seeds — generated once so they don't shimmer between frames.
+  const tableEncrust = (() => {
+    const TBL = TABLE;
+    const seed = (n) => { let x = Math.sin(n*5333)*10000; return x - Math.floor(x); };
+    const items = [];
+    // Heavy encrustation around the table rim and surface
+    for (let i = 0; i < 130; i++) {
+      const ang = seed(i) * Math.PI * 2;
+      const onSurface = seed(i + 200) > 0.45;
+      // Distance from center: most cluster on the rim, some inside
+      const r = onSurface ? (0.35 + seed(i+100)*0.55) : (0.92 + seed(i+100)*0.08);
+      const x = TBL.cx + Math.cos(ang) * TBL.rx * r;
+      const y = TBL.cy + Math.sin(ang) * TBL.ry * r;
+      // Bias toward moss (60%) — wet algae everywhere
+      const k = seed(i+400);
+      const kind = k > 0.7 ? 'barnacle' : (k > 0.18 ? 'moss' : 'coral');
+      items.push({
+        x: Math.round(x),
+        y: Math.round(y),
+        size: 1 + Math.floor(seed(i+300)*3),
+        kind,
+      });
+    }
+    // Big mossy patches across the surface (drawn as smears, not just dots)
+    for (let i = 0; i < 14; i++) {
+      const ang = seed(i+1500) * Math.PI * 2;
+      const r = 0.3 + seed(i+1600)*0.55;
+      items.push({
+        x: Math.round(TBL.cx + Math.cos(ang) * TBL.rx * r),
+        y: Math.round(TBL.cy + Math.sin(ang) * TBL.ry * r),
+        size: 4 + Math.floor(seed(i+1700)*4),
+        kind: 'mossPatch',
+      });
+    }
+    // Mossy drips down the front skirt
+    const drips = [];
+    for (let i = 0; i < 18; i++) {
+      drips.push({
+        x: Math.round(TBL.cx - TBL.rx + 10 + seed(i+700) * (TBL.rx*2 - 20)),
+        len: 4 + Math.floor(seed(i+800) * 14),
+        kind: seed(i+900) > 0.5 ? 'algae' : 'tendril',
+      });
+    }
+    // Carved swirl pattern positions along the front skirt
+    const swirls = [];
+    for (let i = 0; i < 6; i++) {
+      swirls.push({
+        x: Math.round(TBL.cx - TBL.rx*0.7 + i * (TBL.rx*1.4/5)),
+        y: TBL.cy + TBL.ry + 14,
+      });
+    }
+    // Plank seams across the table top
+    const seams = [];
+    const planks = 4;
+    for (let i = 1; i < planks; i++) {
+      seams.push(Math.round(TBL.cx - TBL.rx + i * (TBL.rx*2/planks)));
+    }
+    // Cracks (jagged dark lines)
+    const cracks = [];
+    for (let i = 0; i < 5; i++) {
+      const sx = TBL.cx + (seed(i+1000)*2-1) * TBL.rx*0.6;
+      const sy = TBL.cy + (seed(i+1100)*2-1) * TBL.ry*0.6;
+      const seg = [];
+      let cx2 = sx, cy2 = sy;
+      const segs = 3 + Math.floor(seed(i+1200)*4);
+      for (let s = 0; s < segs; s++) {
+        cx2 += (seed(i*7+s*13+1300)*2-1) * 6;
+        cy2 += (seed(i*7+s*13+1400)*2-1) * 3;
+        seg.push({ x: Math.round(cx2), y: Math.round(cy2) });
+      }
+      cracks.push(seg);
+    }
+    return { items, drips, swirls, seams, cracks };
+  })();
+
+  function drawTable() {
+    const {cx, cy, rx, ry} = TABLE;
+    // -- 1. Soft floor shadow under table
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + ry + 10, rx + 18, ry*0.55, 0, 0, Math.PI*2);
+    ctx.fill();
+    // -- 2. Front skirt (the visible front face of the table)
+    // Dark mossy base
+    ctx.fillStyle = '#1a1a10';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + ry, rx, ry*0.45, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.fillRect(cx - rx, cy, rx*2, ry);
+    // Skirt — decayed wood drowned in algae, green-shifted heavily
+    const skirtTop = cy + 2;
+    const skirtH = ry + 10;
+    for (let py = 0; py < skirtH; py++) {
+      const t = py / skirtH;
+      // Mossy green-brown gradient — top dark, bottom slightly lit by ambient
+      const r = Math.round(20 + t*14);
+      const g = Math.round(28 + t*22);
+      const b = Math.round(14 + t*10);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(cx - rx, skirtTop + py, rx*2, 1);
+    }
+    // Vertical plank seams
+    ctx.fillStyle = '#050804';
+    for (let i = 1; i < 8; i++) {
+      const px = Math.round(cx - rx + i*(rx*2/8));
+      ctx.fillRect(px, skirtTop, 1, skirtH);
+    }
+    // BIG carved swirl ornaments on the skirt — Aztec/scrimshaw scrollwork
+    for (const s of tableEncrust.swirls) {
+      const ox = s.x, oy = s.y;
+      // Outer dark ring (~12 px wide)
+      ctx.fillStyle = '#0a1208';
+      // Top arc
+      ctx.fillRect(ox-5, oy-3, 11, 1);
+      // Bottom arc
+      ctx.fillRect(ox-5, oy+3, 11, 1);
+      // Sides
+      ctx.fillRect(ox-6, oy-2, 1, 5);
+      ctx.fillRect(ox+6, oy-2, 1, 5);
+      // Diagonal corners
+      ctx.fillRect(ox-5, oy-2, 1, 1);
+      ctx.fillRect(ox+5, oy-2, 1, 1);
+      ctx.fillRect(ox-5, oy+2, 1, 1);
+      ctx.fillRect(ox+5, oy+2, 1, 1);
+      // Mid swirl — spiral pattern
+      ctx.fillStyle = '#3a4a28';
+      ctx.fillRect(ox-3, oy-1, 7, 1);
+      ctx.fillRect(ox-3, oy+1, 7, 1);
+      ctx.fillRect(ox-3, oy, 1, 1);
+      ctx.fillRect(ox+3, oy, 1, 1);
+      // Inner highlight (carved depth catching faint light)
+      ctx.fillStyle = '#5a6a40';
+      ctx.fillRect(ox-1, oy, 3, 1);
+      // Mossy buildup in the carving valleys
+      ctx.fillStyle = '#1a3014';
+      ctx.fillRect(ox-4, oy-2, 1, 1);
+      ctx.fillRect(ox+4, oy+2, 1, 1);
+      ctx.fillRect(ox-2, oy-2, 1, 1);
+      ctx.fillRect(ox+2, oy+2, 1, 1);
+    }
+    // Mossy drips and tendrils dangling off the front skirt
+    for (const d of tableEncrust.drips) {
+      const baseY = skirtTop;
+      for (let py = 0; py < d.len; py++) {
+        if (d.kind === 'algae') {
+          ctx.fillStyle = py % 2 === 0 ? '#1a3018' : '#0a200c';
+        } else {
+          ctx.fillStyle = '#101810';
+        }
+        ctx.fillRect(d.x, baseY + py + 2, 1, 1);
+        if (d.kind === 'algae' && py === d.len - 1) {
+          ctx.fillStyle = '#2a4020';
+          ctx.fillRect(d.x - 1, baseY + py + 2, 3, 1);
+        }
+      }
+    }
+    // -- 3. Tabletop ellipse (mossy weathered wood — heavy algae stain)
+    // Outer mossy rim (deep forest green, almost black)
+    ctx.fillStyle = '#1a2814';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Mid stained-wood ring (greenish-brown)
+    ctx.fillStyle = '#2a3a18';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx-8, ry-4, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Inner playing surface (still mossy but lighter — where dice land)
+    ctx.fillStyle = '#3a4220';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx-16, ry-9, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Inner-most stain (a slightly cleaner playing pool)
+    ctx.fillStyle = '#3a3a1c';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx-26, ry-14, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Top-rim highlight (back side catches lantern light) — tinted green
+    ctx.fillStyle = '#4a5828';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - 2, rx-4, ry-4, 0, Math.PI + 0.2, Math.PI*2 - 0.2);
+    ctx.fill();
+    // Tabletop plank seams
+    ctx.fillStyle = '#1a1408';
+    for (const sx of tableEncrust.seams) {
+      // Seam runs vertically across the elliptical top
+      const ddx = (sx - cx) / rx;
+      const verticalLimit = ry * Math.sqrt(Math.max(0, 1 - ddx*ddx));
+      const y0 = Math.round(cy - verticalLimit);
+      const y1 = Math.round(cy + verticalLimit);
+      ctx.fillRect(sx, y0, 1, y1 - y0);
+    }
+    // Cracks
+    ctx.fillStyle = '#0a0604';
+    for (const seg of tableEncrust.cracks) {
+      for (let i = 0; i < seg.length - 1; i++) {
+        const a = seg[i], b = seg[i+1];
+        // pixel-stepped line
+        const dx2 = b.x - a.x, dy2 = b.y - a.y;
+        const steps = Math.max(1, Math.max(Math.abs(dx2), Math.abs(dy2)));
+        for (let k = 0; k <= steps; k++) {
+          const u = k/steps;
+          ctx.fillRect(Math.round(a.x + dx2*u), Math.round(a.y + dy2*u), 1, 1);
+        }
+      }
+    }
+    // Wood grain — subtle horizontal streaks on each plank
+    ctx.fillStyle = '#2a2010';
+    const planks = tableEncrust.seams;
+    const plankXs = [cx - rx, ...planks, cx + rx];
+    for (let pi = 0; pi < plankXs.length - 1; pi++) {
+      const px0 = plankXs[pi];
+      const px1 = plankXs[pi+1];
+      // 3 grain streaks per plank
+      for (let g = 0; g < 3; g++) {
+        const yOff = (g - 1) * 8 + ((pi % 2) ? 3 : -3);
+        const yy = cy + yOff;
+        // Clip streak inside ellipse
+        const minDx = Math.max((px0 - cx)/rx, (px1 - cx)/rx);
+        const maxDx = Math.min(...[px0, px1].map(x=>(x-cx)/rx));
+        // simpler: just draw across the plank inside the ellipse vertical range at yy
+        for (let xx = px0+1; xx < px1-1; xx += 2) {
+          const ddx2 = (xx - cx)/rx, ddy2 = (yy - cy)/ry;
+          if (ddx2*ddx2 + ddy2*ddy2 < 0.95) ctx.fillRect(xx, yy, 1, 1);
+        }
+      }
+    }
+    // -- 4. Encrustation: barnacles, moss, coral around rim and surface
+    for (const it of tableEncrust.items) {
+      // Make sure inside the table footprint (allow slight bleed off rim)
+      const ddx = (it.x - cx)/rx, ddy = (it.y - cy)/ry;
+      const dist2 = ddx*ddx + ddy*ddy;
+      if (dist2 > 1.06) continue;
+      if (it.kind === 'barnacle') {
+        // Cluster of small white-tipped cones
+        ctx.fillStyle = '#2a3028';
+        ctx.fillRect(it.x, it.y, it.size, it.size);
+        ctx.fillStyle = '#5a6850';
+        ctx.fillRect(it.x, it.y, 1, 1);
+        ctx.fillStyle = '#1a201a';
+        ctx.fillRect(it.x + it.size - 1, it.y + it.size - 1, 1, 1);
+      } else if (it.kind === 'moss') {
+        // Dark green mossy clump
+        ctx.fillStyle = '#1a2a14';
+        ctx.fillRect(it.x, it.y, it.size + 1, 1);
+        ctx.fillStyle = '#0a1a08';
+        ctx.fillRect(it.x, it.y + 1, it.size, 1);
+        ctx.fillStyle = '#2a3a18';
+        ctx.fillRect(it.x + 1, it.y, 1, 1);
+      } else if (it.kind === 'coral') {
+        // Tiny pink-orange branching coral
+        ctx.fillStyle = '#6a3020';
+        ctx.fillRect(it.x, it.y, 2, 1);
+        ctx.fillRect(it.x, it.y - 1, 1, 1);
+        ctx.fillStyle = '#a04830';
+        ctx.fillRect(it.x, it.y, 1, 1);
+      } else if (it.kind === 'mossPatch') {
+        // Larger irregular mossy patch — a smear of green
+        const sz = it.size;
+        ctx.fillStyle = '#0a1a08';
+        ctx.fillRect(it.x - sz, it.y, sz*2, 1);
+        ctx.fillRect(it.x - sz + 1, it.y - 1, sz*2 - 2, 1);
+        ctx.fillRect(it.x - sz + 1, it.y + 1, sz*2 - 2, 1);
+        ctx.fillStyle = '#1a2a14';
+        ctx.fillRect(it.x - sz + 2, it.y, sz*2 - 4, 1);
+        // tendrils sprouting
+        ctx.fillStyle = '#2a4020';
+        ctx.fillRect(it.x - sz, it.y + 1, 1, 1);
+        ctx.fillRect(it.x + sz - 1, it.y - 1, 1, 1);
+      }
+    }
+    // -- 5. Front rim — a chunky encrusted lip catching the lantern light
+    ctx.fillStyle = '#2a2a14';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + ry - 1, rx, 4, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.fillStyle = '#4a4220';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + ry - 3, rx - 4, 2, 0, 0, Math.PI);
+    ctx.fill();
+    // Cluster a few prominent barnacles right on the front rim where the audience sees them
+    ctx.fillStyle = '#3a4030';
+    for (let i = 0; i < 14; i++) {
+      const t = i / 13;
+      const fx = Math.round(cx - rx + 6 + t*(rx*2 - 12));
+      const fy = cy + ry - 1 + (i % 3 === 0 ? -1 : 0);
+      ctx.fillRect(fx, fy, 2, 2);
+      ctx.fillStyle = i % 2 === 0 ? '#5a6048' : '#2a3022';
+      ctx.fillRect(fx, fy, 1, 1);
+      ctx.fillStyle = '#3a4030';
+    }
+    // -- 6. Subtle bottom-of-skirt shadow line
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(cx - rx, skirtTop + skirtH - 2, rx*2, 2);
+  }
+
+  // ---- Crew silhouettes (Davy Jones lurkers) — varied, looming ----
+  // Positioned along the back wall flanking the players, partially obscured.
+  // Kinds: tentacle, hooded, hunched, spike, shark, hammer, crab, skull, anglerfish, puffer
+  const CREW = [
+    // Far-left big tentacle-faced (close to camera)
+    { x: 4,   baseY: 66,  kind: 'tentacle', w: 64, h: 138, eyeY: 92,  eyeColor: '#80ffe0', dir: 1,  phase: 0.0 },
+    // Behind that — hammerhead
+    { x: 56,  baseY: 78,  kind: 'hammer',   w: 52, h: 102, eyeY: 100, eyeColor: '#80ffe0', dir: 1,  phase: 1.1 },
+    // Mid-left hunched gnarled
+    { x: 108, baseY: 96,  kind: 'hunched',  w: 38, h: 84,  eyeY: 116, eyeColor: '#a0f080', dir: 1,  phase: 2.7 },
+    // Center-rear (smaller, distant) — coral skull
+    { x: 156, baseY: 102, kind: 'skull',    w: 30, h: 72,  eyeY: 124, eyeColor: '#80ffe0', dir: 1,  phase: 3.4 },
+    // Far back behind table center — angler with lure
+    { x: 220, baseY: 100, kind: 'anglerfish', w: 38, h: 76, eyeY: 126, eyeColor: '#ffe080', dir: -1, phase: 1.7 },
+    // Right of center — shark-headed
+    { x: 270, baseY: 96,  kind: 'shark',    w: 38, h: 84,  eyeY: 116, eyeColor: '#ff5020', dir: -1, phase: 0.4 },
+    // Mid-right pufferfish-spike
+    { x: 322, baseY: 88,  kind: 'puffer',   w: 44, h: 92,  eyeY: 110, eyeColor: '#ff5020', dir: -1, phase: 2.1 },
+    // Right crab-clawed hooded
+    { x: 376, baseY: 78,  kind: 'crab',     w: 48, h: 102, eyeY: 100, eyeColor: '#ff5020', dir: -1, phase: 1.4 },
+    // Far-right BIG hooded (close)
+    { x: 422, baseY: 64,  kind: 'hooded',   w: 58, h: 140, eyeY: 90,  eyeColor: '#ff5020', dir: -1, phase: 0.7 },
+  ];
+
+  function drawCrew(t) {
+    const reactT = (window.state && window.state.crewReact) || 0;
+    const gaspT = (window.state && window.state.crewGasp) || 0;
+    for (const c of CREW) {
+      const bob = Math.sin(t*1.0 + c.phase)*1.5 + Math.sin(t*0.4 + c.phase)*0.8;
+      const gaspY = -gaspT * 5;
+      const lean = c.dir * reactT * 6;
+      const x = c.x + lean;
+      const y = c.baseY + bob + gaspY;
+
+      // Outer dark silhouette
+      ctx.fillStyle = '#080604';
+      ctx.fillRect(x, y, c.w, c.h);
+      // Subtle tinge along inner edge
+      ctx.fillStyle = c.eyeColor === '#80ffe0' ? '#0a201a' : '#1a0808';
+      ctx.fillRect(x + (c.dir > 0 ? c.w-3 : 0), y, 3, c.h);
+
+      if (c.kind === 'tentacle') {
+        // Hood/cap
+        ctx.fillStyle = '#102818';
+        ctx.fillRect(x + 4, y, c.w - 8, 22);
+        // Tentacle locks dangling from face
+        const sway = Math.sin(t*1.4 + c.phase)*1.5;
+        for (let i = 0; i < 7; i++) {
+          ctx.fillStyle = '#0a1a14';
+          ctx.fillRect(x + 8 + i*6 + (sway|0), y + 26 + i*1, 3, 28 - i*2);
+          if (i % 2 === 0) {
+            ctx.fillStyle = '#1a3024';
+            ctx.fillRect(x + 8 + i*6 + (sway|0), y + 26 + i*1, 3, 4);
+          }
+        }
+        // Suckers
+        ctx.fillStyle = '#1a3024';
+        for (let i = 0; i < 5; i++) {
+          ctx.fillRect(x + 12 + i*8, y + 60, 2, 2);
+        }
+      } else if (c.kind === 'hooded') {
+        ctx.fillStyle = '#1a0808';
+        ctx.fillRect(x, y, c.w, 26);
+        ctx.fillRect(x+4, y+26, c.w-8, 8);
+        // Coral/barnacle growths on hood
+        ctx.fillStyle = '#3a2418';
+        ctx.fillRect(x + (c.dir > 0 ? c.w-12 : 4), y+4, 6, 4);
+        ctx.fillRect(x + (c.dir > 0 ? c.w-16 : 8), y+10, 4, 3);
+      } else if (c.kind === 'hunched') {
+        ctx.fillStyle = '#0a1010';
+        ctx.fillRect(x-3, y+10, c.w+6, 20);
+        ctx.fillRect(x+4, y, c.w-8, 12);
+      } else if (c.kind === 'spike') {
+        // Spikes on top of head
+        ctx.fillStyle = '#0a0a0a';
+        for (let i = 0; i < 3; i++) {
+          ctx.fillRect(x + 8 + i*10, y - 6 - (i%2)*2, 3, 10);
+        }
+        ctx.fillRect(x + 4, y, c.w - 8, 14);
+      } else if (c.kind === 'hammer') {
+        // Hammerhead — wide flat head bar at top, body below
+        ctx.fillStyle = '#0a1810';
+        // Hammer bar
+        ctx.fillRect(x - 4, y, c.w + 8, 8);
+        ctx.fillRect(x - 6, y + 2, c.w + 12, 4);
+        // Tiny eyes at the ends of the hammer
+        ctx.fillStyle = c.eyeColor;
+        ctx.fillRect(x - 4, y + 3, 2, 2);
+        ctx.fillRect(x + c.w + 2, y + 3, 2, 2);
+        // Body
+        ctx.fillStyle = '#0a1810';
+        ctx.fillRect(x + 6, y + 8, c.w - 12, 18);
+        // Gill slits
+        ctx.fillStyle = '#1a2a20';
+        for (let i = 0; i < 3; i++) ctx.fillRect(x + 10 + i*4, y + 14, 2, 8);
+      } else if (c.kind === 'shark') {
+        // Triangular snout up top, dorsal fin
+        ctx.fillStyle = '#1a1810';
+        // Body
+        ctx.fillRect(x + 4, y + 6, c.w - 8, 18);
+        // Snout taper (toward center of canvas)
+        const snoutDir = c.dir;
+        for (let i = 0; i < 8; i++) {
+          ctx.fillRect(x + (snoutDir > 0 ? c.w - 8 - i : i), y + i, 8, 2);
+        }
+        // Dorsal fin
+        ctx.fillStyle = '#0a0808';
+        ctx.fillRect(x + c.w/2 - 2, y - 6, 4, 8);
+        // Gill slits
+        ctx.fillStyle = '#3a2820';
+        for (let i = 0; i < 3; i++) ctx.fillRect(x + 8 + i*4, y + 14, 2, 6);
+        // Mouth — toothy slash
+        ctx.fillStyle = '#fff8d0';
+        for (let i = 0; i < 5; i++) ctx.fillRect(x + 8 + i*4, y + 22, 2, 2);
+      } else if (c.kind === 'crab') {
+        // Hooded body with a giant claw raised on one side
+        ctx.fillStyle = '#1a0808';
+        ctx.fillRect(x + 4, y, c.w - 8, 28);
+        // Claw arm extending up
+        const clawX = x + (c.dir > 0 ? c.w - 14 : 4);
+        ctx.fillStyle = '#2a1810';
+        ctx.fillRect(clawX, y - 16, 6, 16);
+        // Claw pincer
+        ctx.fillStyle = '#3a1810';
+        ctx.fillRect(clawX - 4, y - 22, 12, 8);
+        ctx.fillStyle = '#1a0a04';
+        ctx.fillRect(clawX - 4, y - 18, 4, 2); // gap in pincer
+        ctx.fillRect(clawX + 4, y - 18, 4, 2);
+        // Coral growths on hood
+        ctx.fillStyle = '#3a2418';
+        ctx.fillRect(x + 6, y + 4, 4, 4);
+        ctx.fillRect(x + c.w - 12, y + 8, 4, 4);
+      } else if (c.kind === 'skull') {
+        // Bare skull-faced sailor — pale skull on dark coat
+        ctx.fillStyle = '#1a1208';
+        ctx.fillRect(x, y + 16, c.w, c.h - 16); // dark coat below
+        // Skull
+        ctx.fillStyle = '#d8c4a0';
+        ctx.fillRect(x + 4, y, c.w - 8, 18);
+        ctx.fillStyle = '#a08a68';
+        ctx.fillRect(x + 4, y + 16, c.w - 8, 2);
+        // Eye sockets (already drawn as eyes — but skull eye sockets are dark)
+        ctx.fillStyle = '#0a0604';
+        ctx.fillRect(x + 7, y + 6, 5, 5);
+        ctx.fillRect(x + c.w - 12, y + 6, 5, 5);
+        // Teeth
+        ctx.fillStyle = '#1a0a04';
+        ctx.fillRect(x + 8, y + 14, c.w - 16, 1);
+        for (let i = 0; i < 4; i++) ctx.fillRect(x + 9 + i*3, y + 13, 2, 3);
+      } else if (c.kind === 'anglerfish') {
+        // Fish-headed with a glowing lure dangling from a stalk
+        ctx.fillStyle = '#0a0810';
+        ctx.fillRect(x + 4, y + 6, c.w - 8, 22);
+        // Lure stalk
+        ctx.fillStyle = '#1a1418';
+        ctx.fillRect(x + c.w/2 - 1, y - 14, 2, 14);
+        // Glowing lure ball — pulses
+        const pulse = 0.6 + Math.sin(t*3 + c.phase)*0.4;
+        ctx.fillStyle = c.eyeColor;
+        ctx.fillRect(x + c.w/2 - 2, y - 18, 4, 4);
+        ctx.globalAlpha = pulse * 0.6;
+        ctx.fillRect(x + c.w/2 - 4, y - 20, 8, 8);
+        ctx.globalAlpha = 1;
+        // Jagged teeth — long fangs
+        ctx.fillStyle = '#fff8d0';
+        for (let i = 0; i < 4; i++) ctx.fillRect(x + 8 + i*5, y + 16, 2, 4);
+        // Body fin
+        ctx.fillStyle = '#0a0408';
+        ctx.fillRect(x + 2, y + 22, 4, 8);
+        ctx.fillRect(x + c.w - 6, y + 22, 4, 8);
+      } else if (c.kind === 'puffer') {
+        // Round body covered in spikes
+        ctx.fillStyle = '#2a1810';
+        ctx.fillRect(x + 4, y + 4, c.w - 8, c.h - 12);
+        // Belly highlight
+        ctx.fillStyle = '#3a2818';
+        ctx.fillRect(x + 6, y + 8, c.w - 12, 12);
+        // Spikes radiating outward
+        ctx.fillStyle = '#0a0604';
+        // Top spikes
+        for (let i = 0; i < 5; i++) ctx.fillRect(x + 6 + i*7, y, 2, 4);
+        // Side spikes
+        for (let i = 0; i < 5; i++) {
+          ctx.fillRect(x, y + 8 + i*8, 4, 2);
+          ctx.fillRect(x + c.w - 4, y + 8 + i*8, 4, 2);
+        }
+        // Bottom spikes
+        for (let i = 0; i < 5; i++) ctx.fillRect(x + 6 + i*7, y + c.h - 14, 2, 4);
+      }
+
+      // Glowing eyes
+      const eyeBaseX = x + (c.dir > 0 ? c.w-12 : 6);
+      const blink = (Math.sin(t*0.3 + c.phase*3) > 0.97) ? 0 : 1;
+      if (blink) {
+        ctx.fillStyle = c.eyeColor;
+        ctx.fillRect(eyeBaseX, y + (c.eyeY - c.baseY), 3, 3);
+        ctx.fillRect(eyeBaseX + (c.dir > 0 ? -6 : 6), y + (c.eyeY - c.baseY), 3, 3);
+        // Halo
+        ctx.globalAlpha = 0.4;
+        ctx.fillRect(eyeBaseX - 1, y + (c.eyeY - c.baseY) - 1, 5, 5);
+        ctx.fillRect(eyeBaseX + (c.dir > 0 ? -7 : 5), y + (c.eyeY - c.baseY) - 1, 5, 5);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function drawLantern(t) {
+    const flicker = 1 + (Math.random()-0.5)*0.18 + Math.sin(t*9)*0.05;
+    const lx = 70, ly = 30;
+    const sway = Math.sin(t*1.5)*2;
+    ctx.fillStyle = '#1a1004';
+    ctx.fillRect(lx, 0, 1, ly);
+    ctx.fillStyle = '#3a2410';
+    ctx.fillRect(lx-5+sway, ly, 11, 2);
+    ctx.fillStyle = '#f4d27a';
+    ctx.fillRect(lx-4+sway, ly+2, 9, 8);
+    ctx.fillStyle = '#ff8030';
+    ctx.fillRect(lx-3+sway, ly+3, 7, 6);
+    ctx.fillStyle = '#fff8c0';
+    ctx.fillRect(lx-1+sway, ly+5, 3, 3);
+    ctx.fillStyle = '#3a2410';
+    ctx.fillRect(lx-5+sway, ly+10, 11, 2);
+    // Glow
+    const glow = ctx.createRadialGradient(lx+sway, ly+6, 4, lx+sway, ly+6, 100*flicker);
+    glow.addColorStop(0, `rgba(255,180,80,${0.5*flicker})`);
+    glow.addColorStop(0.4, `rgba(255,140,50,${0.18*flicker})`);
+    glow.addColorStop(1, 'rgba(255,140,50,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0,0,W,H);
+    if (Math.random() < 0.15) {
+      state.particles.push({
+        x: lx+sway + (Math.random()-0.5)*4,
+        y: ly+9,
+        vx: (Math.random()-0.5)*4,
+        vy: 6 + Math.random()*8,
+        life: 1.0 + Math.random()*0.8, age: 0,
+        color: '#ffa040', kind: 'ember',
+      });
+    }
+  }
+
+  function drawScene(dt) {
+    drawWindow(dt);
+    drawCabinWall();
+    drawWallGrowth();
+    drawCrew(elapsed);
+    drawBioSpecks(elapsed);
+    drawTable();
+    drawLantern(elapsed);
+    // Vignette
+    const vg = ctx.createRadialGradient(W/2, H*0.55, H*0.35, W/2, H*0.55, H*1.0);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  // Title screen — kept simple stormy ship
+  function drawTitle(dt) {
+    elapsed += dt;
+    krakenT += dt;
+    lightningT = Math.max(0, lightningT - dt*1.5);
+    lightningNext -= dt;
+    if (lightningNext <= 0) {
+      flash();
+      lightningNext = 3 + Math.random()*5;
+      if (window.AUDIO) AUDIO.thunder();
+    }
+    const skyGrad = ctx.createLinearGradient(0,0,0,H);
+    skyGrad.addColorStop(0, '#080814');
+    skyGrad.addColorStop(0.6, '#181830');
+    skyGrad.addColorStop(1, '#0a0810');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0,0,W,H);
+    if (lightningT > 0) {
+      ctx.fillStyle = `rgba(180,200,255,${lightningT*0.7})`;
+      ctx.fillRect(0,0,W,H);
+      if (lightningT > 0.3) {
+        ctx.fillStyle = '#fff';
+        let bx = 50 + Math.random()*(W-100);
+        for (let by = 0; by < H*0.5; by += 4) {
+          ctx.fillRect(bx, by, 2, 5);
+          bx += (Math.random()-0.5)*10;
+        }
+      }
+    }
+    const horizonY = H*0.6;
+    for (let layer = 0; layer < 3; layer++) {
+      const yBase = horizonY + 5 + layer*20;
+      const amp = 4 + layer*3;
+      const speed = 1 + layer*0.6;
+      const colors = ['#0a1428','#101a32','#181f44'];
+      ctx.fillStyle = colors[layer];
+      for (let x = 0; x < W; x += 2) {
+        const wave = Math.sin(x*0.06 + elapsed*speed)*amp + Math.sin(x*0.13 + elapsed*speed*1.4)*amp*0.5;
+        ctx.fillRect(x, yBase + wave, 2, H - (yBase + wave));
+      }
+    }
+    ctx.fillStyle = '#a0b0c0';
+    for (let p of rain) {
+      p.y += 90*dt; p.x -= 35*dt;
+      if (p.y > H) { p.y = -2; p.x = Math.random()*W; }
+      if (p.x < 0) p.x += W;
+      ctx.fillRect(p.x|0, p.y|0, 1, 3);
+    }
+    // Ship
+    ctx.save();
+    ctx.translate(W/2, horizonY + 12 + Math.sin(elapsed*1.4)*4);
+    ctx.rotate(Math.sin(elapsed*1.6)*0.18);
+    ctx.fillStyle = '#3a2410';
+    ctx.fillRect(-50, -8, 100, 14);
+    ctx.fillStyle = '#1a0a04';
+    for (let x = -42; x <= 42; x += 14) ctx.fillRect(x, -2, 4, 4);
+    ctx.fillStyle = '#2a1808';
+    ctx.fillRect(-2, -52, 4, 50);
+    ctx.fillRect(-32, -42, 3, 40);
+    ctx.fillRect(28, -42, 3, 40);
+    ctx.fillStyle = '#3a3024';
+    ctx.fillRect(-22, -48, 44, 32);
+    ctx.fillRect(-44, -38, 24, 22);
+    ctx.fillRect(20, -38, 24, 22);
+    // Jolly Roger
+    ctx.fillStyle = '#1a0a04';
+    ctx.fillRect(0, -58, 14, 8);
+    ctx.fillStyle = '#f4e8c8';
+    ctx.fillRect(4, -56, 4, 4);
+    ctx.fillRect(3, -52, 6, 1);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(5, -55, 1, 1);
+    ctx.fillRect(7, -55, 1, 1);
+    // Portholes glow
+    ctx.fillStyle = '#ffa040';
+    for (let x = -30; x <= 30; x += 15) ctx.fillRect(x, -2, 2, 2);
+    ctx.restore();
+    // Vignette
+    const vg = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.95);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.65)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  return { ctx, W, H, drawScene, drawTitle, flash, TABLE };
+})();
+
+//----------------------------------------------------------------
+// AUDIO
+//----------------------------------------------------------------
+const AUDIO = (() => {
+  let ac = null, masterGain, musicGain, rainGain, windGain, ambientGain, sfxGain, reverb;
+  let muted = false;
+  function init() {
+    if (ac) return;
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = ac.createGain(); masterGain.gain.value = 0.7;
+    masterGain.connect(ac.destination);
+    reverb = ac.createConvolver();
+    reverb.buffer = makeReverbIR(2.6, 2.4);
+    const reverbGain = ac.createGain(); reverbGain.gain.value = 0.35;
+    reverb.connect(reverbGain); reverbGain.connect(masterGain);
+    musicGain = ac.createGain(); musicGain.gain.value = 0.16; musicGain.connect(masterGain);
+    const musicWet = ac.createGain(); musicWet.gain.value = 0.08;
+    musicGain.connect(musicWet); musicWet.connect(reverb);
+    rainGain = ac.createGain(); rainGain.gain.value = 0.07; rainGain.connect(masterGain);
+    windGain = ac.createGain(); windGain.gain.value = 0.05; windGain.connect(masterGain);
+    ambientGain = ac.createGain(); ambientGain.gain.value = 0.5; ambientGain.connect(masterGain);
+    sfxGain = ac.createGain(); sfxGain.gain.value = 0.85; sfxGain.connect(masterGain);
+    startRain(); startWind(); startCreaks(); startShanty();
+  }
+  function makeReverbIR(d, decay) {
+    const len = Math.floor(ac.sampleRate * d);
+    const buf = ac.createBuffer(2, len, ac.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        const t = i/len;
+        data[i] = (Math.random()*2-1) * Math.pow(1-t, decay);
+      }
+    }
+    return buf;
+  }
+  function startRain() {
+    const bs = ac.sampleRate * 2;
+    const buf = ac.createBuffer(1, bs, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bs; i++) d[i] = (Math.random()*2-1)*0.6;
+    const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+    const hp = ac.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1500;
+    const lp = ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=5000;
+    src.connect(hp); hp.connect(lp); lp.connect(rainGain); src.start();
+  }
+  function startWind() {
+    const bs = ac.sampleRate * 4;
+    const buf = ac.createBuffer(1, bs, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < bs; i++) {
+      last = (last + (Math.random()*2-1)*0.06);
+      last = Math.max(-1, Math.min(1, last*0.99));
+      d[i] = last;
+    }
+    const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lp = ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=380;
+    const hp = ac.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=80;
+    const lfo = ac.createOscillator(); const lfoG = ac.createGain();
+    lfo.type='sine'; lfo.frequency.value=0.18; lfoG.gain.value=200;
+    lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start();
+    src.connect(hp); hp.connect(lp); lp.connect(windGain); src.start();
+  }
+  function startCreaks() {
+    const sched = () => {
+      const wait = 6 + Math.random()*12;
+      setTimeout(() => { if (!muted && ac) creak(); sched(); }, wait*1000);
+    };
+    sched();
+  }
+  function creak() {
+    const t0 = ac.currentTime;
+    const dur = 1.4 + Math.random()*0.8;
+    const f = 60 + Math.random()*40;
+    for (let i = 0; i < 2; i++) {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type = i===0 ? 'triangle' : 'sawtooth';
+      o.frequency.setValueAtTime(f*(i?1.005:1), t0);
+      o.frequency.exponentialRampToValueAtTime(f*0.6, t0+dur);
+      const bp = ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=220; bp.Q.value=4;
+      g.gain.setValueAtTime(0,t0);
+      g.gain.linearRampToValueAtTime(0.12, t0+0.2);
+      g.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+      o.connect(bp); bp.connect(g); g.connect(ambientGain);
+      const w = ac.createGain(); w.gain.value=0.5; g.connect(w); w.connect(reverb);
+      o.start(t0); o.stop(t0+dur+0.05);
+    }
+  }
+  function freq(n) {
+    const map = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+    const m = n.match(/^([A-G])(#|b)?(-?\d)$/);
+    if (!m) return 440;
+    let nn = map[m[1]];
+    if (m[2]==='#') nn++;
+    if (m[2]==='b') nn--;
+    const oct = parseInt(m[3]);
+    return 440 * Math.pow(2, (12*(oct+1)+nn-69)/12);
+  }
+  function startShanty() {
+    const melody = [
+      ['D4',1],['F4',1],['A4',1],['D5',1],
+      ['C5',1.5],['A4',0.5],['F4',1],['A4',1],
+      ['G4',1],['F4',1],['E4',1],['D4',1],
+      ['A3',1],['D4',1],['F4',2],
+      ['F4',1],['A4',1],['D5',1],['F5',1],
+      ['E5',1.5],['D5',0.5],['C5',1],['Bb4',1],
+      ['A4',1],['G4',1],['F4',1],['E4',1],
+      ['D4',2],['F4',2],
+    ];
+    const bass = [
+      ['D2',2],['A2',2],['D2',2],['A2',2],
+      ['G2',2],['A2',2],['D2',2],['F2',2],
+      ['D2',2],['Bb2',2],['F2',2],['F2',2],
+      ['Bb2',2],['F2',2],['G2',2],['A2',2],
+    ];
+    const bpm = 78, beat = 60/bpm;
+    function play(t, f, dur, type, vol, wet) {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type = type; o.frequency.value = f;
+      const att = 0.02, rel = Math.min(0.25, dur*0.35);
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(vol, t+att);
+      g.gain.setValueAtTime(vol, t+dur-rel);
+      g.gain.linearRampToValueAtTime(0, t+dur);
+      o.connect(g); g.connect(musicGain);
+      if (wet > 0) { const w = ac.createGain(); w.gain.value = wet; g.connect(w); w.connect(reverb); }
+      o.start(t); o.stop(t+dur+0.02);
+    }
+    function schedVoice(t, voice, type, vol, wet) {
+      let cur = t;
+      for (const [n, b] of voice) {
+        play(cur, freq(n), b*beat*0.92, type, vol, wet);
+        cur += b*beat;
+      }
+      return cur;
+    }
+    function schedAll(t) {
+      schedVoice(t, melody, 'triangle', 0.20, 0.04);
+      schedVoice(t, bass, 'sawtooth', 0.11, 0.0);
+      const total = melody.reduce((s,[,b])=>s+b,0);
+      return t + total*beat;
+    }
+    let next = ac.currentTime + 0.3;
+    function tick() {
+      while (next < ac.currentTime + 6) next = schedAll(next);
+      setTimeout(tick, 1500);
+    }
+    tick();
+  }
+  function thunder() {
+    if (!ac || muted) return;
+    const dur = 2.2 + Math.random()*2.0;
+    const bs = Math.floor(ac.sampleRate*dur);
+    const buf = ac.createBuffer(1, bs, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < bs; i++) {
+      last = last + (Math.random()*2-1)*0.12;
+      last = Math.max(-1, Math.min(1, last*0.985));
+      d[i] = last;
+    }
+    const t0 = ac.currentTime;
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const lp = ac.createBiquadFilter(); lp.type='lowpass';
+    lp.frequency.setValueAtTime(80,t0);
+    lp.frequency.exponentialRampToValueAtTime(220, t0+0.3);
+    lp.frequency.exponentialRampToValueAtTime(60, t0+dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(0.45, t0+0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+    src.connect(lp); lp.connect(g); g.connect(masterGain);
+    const w = ac.createGain(); w.gain.value=0.55; g.connect(w); w.connect(reverb);
+    src.start(t0); src.stop(t0+dur);
+  }
+  function dice() {
+    if (!ac || muted) return;
+    for (let n = 0; n < 5; n++) {
+      const off = n*(0.04 + Math.random()*0.05);
+      const dur = 0.15 + Math.random()*0.1;
+      const t0 = ac.currentTime + off;
+      const bs = Math.max(1, Math.floor(ac.sampleRate*dur));
+      const buf = ac.createBuffer(1, bs, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < bs; i++) d[i] = (Math.random()*2-1)*0.6;
+      const src = ac.createBufferSource(); src.buffer = buf;
+      const bp = ac.createBiquadFilter(); bp.type='bandpass';
+      bp.frequency.value = 1500 + Math.random()*1500; bp.Q.value=1.5;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0,t0);
+      g.gain.linearRampToValueAtTime(0.18+Math.random()*0.1, t0+0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+      src.connect(bp); bp.connect(g); g.connect(sfxGain);
+      src.start(t0); src.stop(t0+dur+0.02);
+    }
+  }
+  function blip(f=440, dur=0.08, type='square', vol=0.18) {
+    if (!ac || muted) return;
+    const o = ac.createOscillator(); const g = ac.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(vol, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+dur);
+    o.connect(g); g.connect(masterGain);
+    o.start(); o.stop(ac.currentTime+dur);
+  }
+  function fanfare(face=2) {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    const base = 196 + face*22;
+    const notes = [[base,0],[base*1.189,0.10],[base*1.498,0.18],[base*1.78,0.32]];
+    for (const [f, off] of notes) {
+      for (const type of ['sawtooth','square']) {
+        const o = ac.createOscillator(); o.type = type; o.frequency.value = f;
+        const lp = ac.createBiquadFilter(); lp.type='lowpass';
+        const start = t0+off;
+        lp.frequency.setValueAtTime(800,start);
+        lp.frequency.exponentialRampToValueAtTime(3200, start+0.05);
+        lp.frequency.exponentialRampToValueAtTime(1200, start+0.4);
+        const g = ac.createGain();
+        const peak = 0.18 * (type === 'square' ? 0.6 : 1);
+        g.gain.setValueAtTime(0,start);
+        g.gain.linearRampToValueAtTime(peak, start+0.025);
+        g.gain.exponentialRampToValueAtTime(0.001, start+0.42);
+        o.connect(lp); lp.connect(g); g.connect(sfxGain);
+        const w = ac.createGain(); w.gain.value=0.3; g.connect(w); w.connect(reverb);
+        o.start(start); o.stop(start+0.5);
+      }
+    }
+  }
+  function slam() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    const stab = [[146.8,0],[110,0.12],[73.4,0.24]];
+    for (const [f, off] of stab) {
+      const o = ac.createOscillator(); o.type='sawtooth'; o.frequency.value = f;
+      const lp = ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 1200;
+      const g = ac.createGain();
+      const start = t0+off;
+      g.gain.setValueAtTime(0,start);
+      g.gain.linearRampToValueAtTime(0.2, start+0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, start+1.6);
+      o.connect(lp); lp.connect(g); g.connect(sfxGain);
+      const w = ac.createGain(); w.gain.value=0.6; g.connect(w); w.connect(reverb);
+      o.start(start); o.stop(start+1.7);
+    }
+    // Sub
+    const sub = ac.createOscillator(); sub.type='sine'; sub.frequency.value=32;
+    const sg = ac.createGain();
+    sg.gain.setValueAtTime(0,t0);
+    sg.gain.linearRampToValueAtTime(0.45, t0+0.01);
+    sg.gain.exponentialRampToValueAtTime(0.001, t0+1.2);
+    sub.connect(sg); sg.connect(masterGain);
+    sub.start(t0); sub.stop(t0+1.3);
+  }
+  function heartbeat() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    for (let i = 0; i < 2; i++) {
+      const start = t0 + i*0.20;
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type='sine';
+      o.frequency.setValueAtTime(78, start);
+      o.frequency.exponentialRampToValueAtTime(45, start+0.18);
+      g.gain.setValueAtTime(0,start);
+      g.gain.linearRampToValueAtTime(0.42, start+0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, start+0.22);
+      o.connect(g); g.connect(sfxGain);
+      o.start(start); o.stop(start+0.25);
+    }
+  }
+  function winSting() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    const arp = [293.66, 369.99, 440, 587.33, 739.99, 880];
+    arp.forEach((f, i) => {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type='square'; o.frequency.value = f;
+      const start = t0 + i*0.085;
+      g.gain.setValueAtTime(0,start);
+      g.gain.linearRampToValueAtTime(0.16, start+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, start+0.32);
+      o.connect(g); g.connect(sfxGain);
+      const w = ac.createGain(); w.gain.value=0.4; g.connect(w); w.connect(reverb);
+      o.start(start); o.stop(start+0.35);
+    });
+  }
+  function loseSting() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    [220,196,174.6,146.83].forEach((f,i) => {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type='triangle'; o.frequency.value = f;
+      const start = t0 + i*0.18;
+      g.gain.setValueAtTime(0,start);
+      g.gain.linearRampToValueAtTime(0.18, start+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, start+0.5);
+      o.connect(g); g.connect(sfxGain);
+      const w = ac.createGain(); w.gain.value=0.5; g.connect(w); w.connect(reverb);
+      o.start(start); o.stop(start+0.55);
+    });
+  }
+  function wail() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    const o = ac.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(880, t0);
+    o.frequency.exponentialRampToValueAtTime(220, t0+1.6);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(0.16, t0+0.15);
+    g.gain.exponentialRampToValueAtTime(0.001, t0+2.0);
+    o.connect(g); g.connect(sfxGain);
+    const w = ac.createGain(); w.gain.value=0.85; g.connect(w); w.connect(reverb);
+    o.start(t0); o.stop(t0+2.05);
+  }
+  function tableThump() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    const sub = ac.createOscillator(); sub.type='sine';
+    sub.frequency.setValueAtTime(180,t0);
+    sub.frequency.exponentialRampToValueAtTime(40, t0+0.35);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(0.55, t0+0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t0+0.45);
+    sub.connect(g); g.connect(sfxGain);
+    sub.start(t0); sub.stop(t0+0.5);
+  }
+  function setMuted(m) { muted = m; if (masterGain) masterGain.gain.value = m ? 0 : 0.7; }
+  return { init, thunder, dice, blip, fanfare, slam, heartbeat, winSting, loseSting, wail, tableThump, setMuted, get muted(){return muted;} };
+})();
+
+//----------------------------------------------------------------
+// DICE / CUP rendering
+//----------------------------------------------------------------
+function drawDie(ctx, x, y, face, size=12, hidden=false, wild=false) {
+  // Drop shadow (only on bigger dice — clutters small ones)
+  if (size >= 16) {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(x+1, y+size, size, 2);
+  }
+  // Body — ivory bone
+  ctx.fillStyle = hidden ? '#3a2410' : '#fff0c8';
+  ctx.fillRect(x, y, size, size);
+  // Outer rim shadow
+  ctx.fillStyle = hidden ? '#1a0a04' : '#a07840';
+  ctx.fillRect(x, y+size-1, size, 1);
+  ctx.fillRect(x+size-1, y, 1, size);
+  // Top-left highlight
+  ctx.fillStyle = hidden ? '#5a3818' : '#fff8e8';
+  ctx.fillRect(x, y, size, 1);
+  ctx.fillRect(x, y, 1, size);
+  // Inner bevel — only on larger dice
+  if (size >= 18) {
+    ctx.fillStyle = hidden ? '#2a1808' : '#f0d8a0';
+    ctx.fillRect(x+1, y+size-2, size-2, 1);
+    ctx.fillRect(x+size-2, y+1, 1, size-2);
+  }
+  if (hidden) return;
+  // Pips — sized for legibility at small canvases too
+  const pipColor = wild ? '#c01010' : '#1a0a04';
+  // pipD is the pip's drawn dimension. Tuned per die size so 5/6 don't overlap.
+  let pipD;
+  if (size <= 12) pipD = 2;
+  else if (size <= 16) pipD = 3;
+  else if (size <= 22) pipD = 4;
+  else pipD = 5;
+  const offset = Math.floor(pipD/2);
+  const drawShadow = size >= 18;
+  const pip = (gx, gy) => {
+    // gx, gy in {1,2,3} → centered at size * gx/4
+    const px = x + Math.round(size * gx/4) - offset;
+    const py = y + Math.round(size * gy/4) - offset;
+    if (drawShadow) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(px, py+1, pipD, pipD);
+    }
+    ctx.fillStyle = pipColor;
+    ctx.fillRect(px, py, pipD, pipD);
+  };
+  const positions = {
+    1: [[2,2]],
+    2: [[1,1],[3,3]],
+    3: [[1,1],[2,2],[3,3]],
+    4: [[1,1],[1,3],[3,1],[3,3]],
+    5: [[1,1],[1,3],[2,2],[3,1],[3,3]],
+    6: [[1,1],[1,2],[1,3],[3,1],[3,2],[3,3]],
+  };
+  for (const [px,py] of positions[face]) pip(px, py);
+}
+
+function drawFaceIcon(canv, face) {
+  const c = canv.getContext('2d');
+  c.imageSmoothingEnabled = false;
+  c.clearRect(0,0,canv.width, canv.height);
+  drawDie(c, 0, 0, face, 12, false, face===1);
+}
+
+function drawCup(ctx, x, y, lifted=false, dice=null, scale=1) {
+  // Cup with proper tapered silhouette + visible dark interior at the top.
+  const topW = Math.round(30*scale);
+  const botW = Math.round(24*scale);
+  const h = Math.round((lifted ? 20 : 30)*scale);
+  // Ground shadow — elliptical under the cup
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.ellipse(x + topW/2, y + h + 1, botW/2 + 3, 2.5, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  let cupY = y;
+  if (lifted && dice) {
+    const dieSize = 7;
+    const gap = 1;
+    const totalW = dice.length*(dieSize+gap) - gap;
+    const startX = x + (topW - totalW)/2;
+    for (let i = 0; i < dice.length; i++) {
+      drawDie(ctx, Math.round(startX + i*(dieSize+gap)), y + h - 2, dice[i], dieSize, false, dice[i]===1);
+    }
+    cupY = y - Math.round(20*scale);
+  }
+
+  // Helper: width at row r in the cup body (linear taper top→bottom)
+  const widthAt = (r) => Math.round(topW - (topW - botW) * (r / Math.max(1, h-1)));
+  const offsetAt = (r) => (topW - widthAt(r)) / 2;
+
+  // CUP BODY — render row by row so the silhouette tapers
+  for (let r = 3; r < h - 1; r++) {
+    const w = widthAt(r);
+    const off = offsetAt(r);
+    const px = x + off;
+    const py = cupY + r;
+    // Base leather color
+    ctx.fillStyle = '#1a0e08';
+    ctx.fillRect(px, py, w, 1);
+    // Left highlight edge
+    ctx.fillStyle = '#3a2418';
+    ctx.fillRect(px, py, 2, 1);
+    // Right shadow edge
+    ctx.fillStyle = '#000';
+    ctx.fillRect(px + w - 1, py, 1, 1);
+  }
+
+  // TOP RIM — clearly shows the cup is open with a dark interior
+  // Outer rim outline
+  ctx.fillStyle = '#0a0604';
+  ctx.fillRect(x, cupY + 1, topW, 1);
+  ctx.fillRect(x, cupY + 2, topW, 1);
+  // Dark interior peeking through (the mouth of the cup)
+  ctx.fillStyle = '#000';
+  ctx.fillRect(x + 2, cupY + 2, topW - 4, 2);
+  ctx.fillStyle = '#1a0a04';
+  ctx.fillRect(x + 3, cupY + 3, topW - 6, 1);
+  // Front-rim curve (catches lantern light on the back-edge of the opening)
+  ctx.fillStyle = '#5a3018';
+  ctx.fillRect(x + 1, cupY + 1, topW - 2, 1);
+  // Outer rim corners (curve hint)
+  ctx.fillStyle = '#3a2418';
+  ctx.fillRect(x, cupY + 1, 1, 2);
+  ctx.fillRect(x + topW - 1, cupY + 1, 1, 2);
+  // Top corners rounded with a missing pixel
+  ctx.fillStyle = 'rgba(0,0,0,0)'; // no-op clear
+  // (the empty row 0 above the rim already gives the rounded look)
+
+  // IRON STRAP — middle of cup (tapered to follow body)
+  const strapR = Math.round(h * 0.5);
+  const strapW = widthAt(strapR);
+  const strapOff = offsetAt(strapR);
+  ctx.fillStyle = '#0a0604';
+  ctx.fillRect(x + strapOff - 1, cupY + strapR, strapW + 2, 4);
+  ctx.fillStyle = '#3a2410';
+  ctx.fillRect(x + strapOff - 1, cupY + strapR, strapW + 2, 1);
+  // Rivets at the band ends
+  ctx.fillStyle = '#5a4020';
+  ctx.fillRect(x + strapOff, cupY + strapR + 1, 1, 1);
+  ctx.fillRect(x + strapOff + strapW - 1, cupY + strapR + 1, 1, 1);
+
+  // ENCRUSTATION — moss + barnacle nubs on the rim and side
+  // Barnacle clusters on the rim
+  ctx.fillStyle = '#3a4030';
+  ctx.fillRect(x + 3, cupY, 2, 2);
+  ctx.fillRect(x + topW - 5, cupY, 2, 2);
+  ctx.fillRect(x + Math.round(topW*0.4), cupY, 2, 2);
+  ctx.fillStyle = '#5a6048';
+  ctx.fillRect(x + 3, cupY, 1, 1);
+  ctx.fillRect(x + topW - 5, cupY, 1, 1);
+  // Mossy patch on lower-left
+  const lowR = h - 4;
+  const lowOff = offsetAt(lowR);
+  const lowW = widthAt(lowR);
+  ctx.fillStyle = '#0a1a08';
+  ctx.fillRect(x + lowOff + 1, cupY + lowR, 5, 2);
+  ctx.fillStyle = '#1a2a14';
+  ctx.fillRect(x + lowOff + 1, cupY + lowR, 4, 1);
+  // Coral nub upper-right
+  ctx.fillStyle = '#6a3020';
+  ctx.fillRect(x + topW - 6, cupY + 7, 2, 1);
+  ctx.fillStyle = '#a04830';
+  ctx.fillRect(x + topW - 5, cupY + 6, 1, 1);
+
+  // BOTTOM RIM — slightly darker base
+  ctx.fillStyle = '#000';
+  const botOff = offsetAt(h - 1);
+  ctx.fillRect(x + botOff, cupY + h - 1, lowW, 1);
+  // Heavy crud at base
+  ctx.fillStyle = '#0a1a08';
+  ctx.fillRect(x + botOff + 1, cupY + h - 2, 4, 1);
+  ctx.fillRect(x + botOff + lowW - 5, cupY + h - 2, 4, 1);
+}
+
+//----------------------------------------------------------------
+// GAME STATE
+//----------------------------------------------------------------
+const state = {
+  players: [],
+  current: 0,
+  bid: null,
+  phase: 'menu',
+  round: 0,
+  totalDice() { return this.players.reduce((s,p)=>s + (p.alive?p.dice.length:0), 0); },
+  alivePlayers() { return this.players.filter(p=>p.alive); },
+  log: [],
+  reveal: null,
+  shake: {},
+  effects: [],
+  screenShake: 0,
+  flashColor: null,
+  particles: [],
+  crewReact: 0,
+  crewGasp: 0,
+  boatRock: 0,
+  appPhase: 'title',
+  netMode: 'offline', // 'offline' | 'host' | 'client'
+  mode: 'solo',
+  numHumans: 2,
+  humanAvatars: [],
+  humanNames: [],
+  pickIndex: 0,
+  humanRevealed: true,
+};
+window.state = state;
+
+function logEvent(msg, cls='') {
+  state.log.unshift({ msg, cls });
+  if (state.log.length > 30) state.log.pop();
+  renderLog();
+}
+function renderLog() {
+  const el = document.getElementById('log-entries');
+  el.innerHTML = state.log.map(e => `<div class="log-entry ${e.cls}">${e.msg}</div>`).join('');
+}
+function showToast(msg, dur=2.5) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.remove('show'), dur*1000);
+}
+
+//----------------------------------------------------------------
+// DICE / PROBABILITY
+//----------------------------------------------------------------
+function rollAll() {
+  for (const p of state.players) {
+    if (!p.alive) continue;
+    p.dice = p.dice.map(() => 1 + Math.floor(Math.random()*6));
+    state.shake[p.id] = 0.6;
+  }
+  AUDIO.dice();
+  logEvent('— ROUND ' + state.round + ' — Dice rolled.', '');
+}
+function countMatches(face) {
+  let total = 0;
+  for (const p of state.players) {
+    if (!p.alive) continue;
+    for (const d of p.dice) {
+      if (d === face) total++;
+      else if (face !== 1 && d === 1) total++;
+    }
+  }
+  return total;
+}
+function probAtLeast(need, unknown, face) {
+  if (need <= 0) return 1;
+  if (need > unknown) return 0;
+  const p = (face === 1) ? 1/6 : 1/3;
+  let prob = 0;
+  let pk = Math.pow(1-p, unknown);
+  for (let k = 0; k <= unknown; k++) {
+    if (k >= need) prob += pk;
+    pk = pk * (p/(1-p)) * (unknown - k) / (k+1);
+  }
+  return prob;
+}
+
+function aiDecide(player) {
+  const totalDice = state.totalDice();
+  const myDice = player.dice;
+  const unknown = totalDice - myDice.length;
+  if (!state.bid) {
+    const counts = {};
+    for (let f = 2; f <= 6; f++) counts[f] = myDice.filter(d=>d===f).length + myDice.filter(d=>d===1).length;
+    let bestFace = 2, bestCount = -1;
+    for (let f = 2; f <= 6; f++) if (counts[f] > bestCount) { bestCount = counts[f]; bestFace = f; }
+    const expected = bestCount + unknown/3;
+    const aggro = player.ai.aggro;
+    let qty = Math.max(1, Math.round(expected * (0.7 + aggro*0.4)));
+    return { type: 'bid', qty, face: bestFace };
+  }
+  const myMatches = myDice.filter(d => d === state.bid.face || (state.bid.face !== 1 && d === 1)).length;
+  const need = state.bid.qty - myMatches;
+  const probTrue = probAtLeast(need, unknown, state.bid.face);
+  if (probTrue < player.ai.callTreshold) return { type: 'liar' };
+  const aggro = player.ai.aggro;
+  const candidates = [];
+  candidates.push({ qty: state.bid.qty + 1, face: state.bid.face });
+  for (let f = state.bid.face + 1; f <= 6; f++) candidates.push({ qty: state.bid.qty, face: f });
+  for (let f = 2; f <= 6; f++) candidates.push({ qty: state.bid.qty + 1, face: f });
+  let best = null; let bestScore = -1;
+  for (const c of candidates) {
+    if (!isHigherBid(c, state.bid)) continue;
+    const myMatch = myDice.filter(d => d === c.face || (c.face !== 1 && d === 1)).length;
+    const cNeed = c.qty - myMatch;
+    const cProb = probAtLeast(cNeed, unknown, c.face);
+    const target = 0.55 - aggro*0.3;
+    const score = -Math.abs(cProb - target) + (cProb > 0.15 ? 0 : -2);
+    if (score > bestScore) { bestScore = score; best = c; }
+  }
+  if (!best || probAtLeast(best.qty - myMatches, unknown, best.face) < 0.05) return { type: 'liar' };
+  return { type: 'bid', qty: best.qty, face: best.face };
+}
+
+function isHigherBid(a, b) {
+  if (!b) return true;
+  if (a.qty > b.qty) return true;
+  if (a.qty === b.qty && a.face > b.face) return true;
+  return false;
+}
+
+//----------------------------------------------------------------
+// SEAT LAYOUT — players arranged tightly around the oval table
+//----------------------------------------------------------------
+function assignSeats() {
+  const T = SCENE.TABLE;
+  const all = state.players;
+  const n = all.length;
+  // Player[0] sits at front (closest to camera). Everyone else spreads across the back arc.
+  // Front angle = +PI/2 (bottom of ellipse). Back center = -PI/2 (top).
+  const angles = [Math.PI/2];
+  const back = n - 1;
+  if (back === 1) {
+    angles.push(-Math.PI/2);
+  } else if (back > 1) {
+    const spread = Math.PI * 0.85; // ~150° arc across the back
+    for (let i = 0; i < back; i++) {
+      const t = i / (back - 1);
+      angles.push(-Math.PI/2 - spread/2 + t*spread);
+    }
+  }
+
+  // In online play, each device shows its own player at the front. Locally,
+  // hot-seat = 2+ humans on one screen.
+  const online = (state.netMode === 'host' || state.netMode === 'client');
+  const localPlayerIdx = online
+    ? Math.max(0, state.players.findIndex(p => p.peerId && p.peerId === NET.myId))
+    : 0;
+  const isHotseat = !online && state.players.filter(p=>!p.isAI).length >= 2;
+  // We rotate seat assignments so the local player ends up at angle PI/2 (front).
+  // Index 0 in the angles array corresponds to the front; map local-player-index there.
+  for (let i = 0; i < n; i++) {
+    const a = angles[i];
+    // Tight ring — sprites sit right at the table edge
+    const ringRx = T.rx + 8;
+    const ringRy = T.ry + 14;
+    const x = T.cx + Math.cos(a) * ringRx;
+    const y = T.cy + Math.sin(a) * ringRy;
+    // Compute which player object this seat is for — front (i=0) goes to local player online.
+    const playerForSeat = online
+      ? (i === 0 ? all[localPlayerIdx] : all[(localPlayerIdx + i) % n])
+      : all[i];
+    const isFront = (i === 0) && (!isHotseat ? !playerForSeat.isAI : true);
+    playerForSeat.seat = {
+      x: Math.round(x),
+      y: Math.round(y),
+      angle: a,
+      side: isFront ? 'front' : 'back',
+      // Cups sit on the table edge inside the player's seat (between seat and center)
+      cupX: Math.round(T.cx + Math.cos(a) * (T.rx - 18) - 14),
+      cupY: Math.round(T.cy + Math.sin(a) * (T.ry - 10) - 11),
+    };
+  }
+}
+
+//----------------------------------------------------------------
+// TURN FLOW
+//----------------------------------------------------------------
+function startGameSolo(playerName, aiIds, avatar) {
+  state.players = [];
+  const human = {
+    id: 'human_0',
+    name: (playerName || avatar.name).toUpperCase().slice(0,14) || 'CAPTAIN',
+    isAI: false, dice: [1,1,1,1,1], alive: true, seat: null, sprite: avatar.sprite,
+  };
+  state.players.push(human);
+  appendAIs(aiIds);
+  beginGame();
+}
+function startGameMulti(avatars, names, aiIds) {
+  state.players = [];
+  for (let i = 0; i < avatars.length; i++) {
+    const av = avatars[i];
+    state.players.push({
+      id: 'human_' + i,
+      name: (names[i] || av.name).toUpperCase().slice(0,14) || `P${i+1}`,
+      isAI: false, dice: [1,1,1,1,1], alive: true, seat: null, sprite: av.sprite,
+    });
+  }
+  appendAIs(aiIds);
+  beginGame();
+}
+function appendAIs(aiIds) {
+  for (const aiId of aiIds) {
+    const proto = PIRATES.find(p=>p.id===aiId);
+    state.players.push({
+      id: proto.id, name: proto.name,
+      isAI: true, ai: proto, sprite: proto.sprite,
+      dice: [1,1,1,1,1], alive: true, seat: null,
+    });
+  }
+}
+function beginGame() {
+  assignSeats();
+  state.round = 1;
+  state.current = 0;
+  state.bid = null;
+  state.phase = 'rolling';
+  state.appPhase = 'game';
+  document.getElementById('title-screen').classList.add('hidden');
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  AUDIO.init();
+  rollAll();
+  setTimeout(() => { state.phase = 'bidding'; nextTurn(true); }, 1500);
+  logEvent('Aboard the Flying Dutchman. Rules: ones be wild.', '');
+}
+function currentPlayer() { return state.players[state.current]; }
+function advanceCurrent() {
+  do { state.current = (state.current + 1) % state.players.length; }
+  while (!state.players[state.current].alive);
+}
+function nextTurn(skipAdvance) {
+  if (state.phase !== 'bidding') return;
+  if (!skipAdvance) advanceCurrent();
+  const p = currentPlayer();
+  // Online play: each player has their own device, so the pass-and-play curtain
+  // never makes sense. Local hot-seat (2+ humans on one screen) is the only case.
+  const online = (state.netMode === 'host' || state.netMode === 'client');
+  if (!p.isAI) {
+    const humanCount = state.players.filter(pl => !pl.isAI).length;
+    state.humanRevealed = online ? true : (humanCount < 2);
+  }
+  updateBanner();
+  updateControls();
+  if (p.isAI) {
+    if (state.netMode !== 'client') {
+      setTimeout(() => doAITurn(), 1200 + Math.random()*900);
+    }
+  } else if (!online) {
+    const humanCount = state.players.filter(pl => !pl.isAI).length;
+    if (humanCount >= 2) showCurtain(p);
+  }
+}
+function showCurtain(player) {
+  state.humanRevealed = false;
+  const c = document.getElementById('curtain');
+  document.getElementById('curtain-name').textContent = player.name;
+  document.getElementById('curtain-bid').textContent =
+    state.bid
+      ? `CURRENT BID: ${state.bid.qty} × ${state.bid.face}${state.bid.face===1?' (ones)':''}`
+      : 'YE OPEN THE BIDDING';
+  const cv = document.getElementById('curtain-portrait');
+  cv.width = 32; cv.height = 32;
+  const cx = cv.getContext('2d');
+  cx.imageSmoothingEnabled = false;
+  cx.clearRect(0,0,32,32);
+  drawSpriteAt(cx, player.sprite, 0, 0, 32);
+  c.classList.remove('hidden');
+}
+document.getElementById('curtain').addEventListener('click', () => {
+  document.getElementById('curtain').classList.add('hidden');
+  state.humanRevealed = true;
+  updateControls();
+  AUDIO.blip(660, 0.06); AUDIO.dice();
+});
+function updateBanner() {
+  const p = currentPlayer();
+  const banner = document.getElementById('status-banner');
+  if (state.phase === 'bidding') {
+    if (state.bid) {
+      banner.innerHTML = `${state.bid.qty}× <span style="color:#f48030">[${state.bid.face}${state.bid.face===1?'★':''}]</span> &mdash; ${p.name} TO ACT`;
+    } else {
+      banner.innerHTML = `${p.name} OPENS THE BIDDING`;
+    }
+  } else if (state.phase === 'reveal') {
+    banner.innerHTML = `THE CUPS BE LIFTED...`;
+  } else if (state.phase === 'gameover') {
+    const winner = state.alivePlayers()[0];
+    banner.innerHTML = `${winner ? winner.name : '???'} WINS THE TABLE!`;
+  } else {
+    banner.innerHTML = 'Shake yer cups...';
+  }
+}
+function updateControls() {
+  const cur = currentPlayer();
+  const myTurn = state.phase === 'bidding' && cur && !cur.isAI && cur.alive && state.humanRevealed;
+  document.getElementById('btn-bid').disabled = !myTurn;
+  document.getElementById('btn-liar').disabled = !myTurn || !state.bid;
+  if (state.bid) {
+    if (humanBid.qty < state.bid.qty) humanBid.qty = state.bid.qty;
+    if (humanBid.qty === state.bid.qty && humanBid.face <= state.bid.face) {
+      humanBid.face = state.bid.face + 1;
+      if (humanBid.face > 6) { humanBid.face = 2; humanBid.qty = state.bid.qty + 1; }
+    }
+  }
+  syncStepper();
+}
+function placeBid(qty, face) {
+  if (state.bid && !isHigherBid({qty,face}, state.bid)) {
+    showToast('BID MUST BE HIGHER!');
+    return false;
+  }
+  state.bid = { qty, face, by: state.current };
+  const p = currentPlayer();
+  if (!p.isAI) state.humanRevealed = false;
+  logEvent(`${p.name}: "${qty}× ${face}${face===1?' (ones)':''}"`, 'bid');
+  AUDIO.fanfare(face);
+  state.screenShake = Math.max(state.screenShake, 0.25);
+  state.flashColor = { r: 255, g: 220, b: 120, a: 0.15, t: 0.25 };
+  state.crewReact = Math.max(state.crewReact, 0.4);
+  const seat = p.seat || { x: SCENE.W/2, y: 100 };
+  state.effects.push({
+    type: 'bidCard', qty, face, name: p.name,
+    fromX: seat.x, fromY: seat.y - 8,
+    toX: SCENE.W/2, toY: 100,
+    t: 0, life: 1.8,
+  });
+  for (let i = 0; i < 14; i++) {
+    state.particles.push({
+      x: seat.x, y: seat.y - 12,
+      vx: (Math.random()-0.5)*40, vy: -20 - Math.random()*30,
+      life: 0.8 + Math.random()*0.4, age: 0,
+      color: ['#f4d27a','#ffd060','#ffa040','#fff8c0'][Math.floor(Math.random()*4)],
+    });
+  }
+  nextTurn();
+  return true;
+}
+function callLiar() {
+  if (!state.bid) return;
+  const caller = currentPlayer();
+  if (!caller.isAI) state.humanRevealed = false;
+  const bidder = state.players[state.bid.by];
+  logEvent(`${caller.name}: "LIAR!"`, 'liar');
+  AUDIO.slam(); AUDIO.heartbeat();
+  setTimeout(() => AUDIO.heartbeat(), 1100);
+  state.effects.push({ type: 'liarSlam', name: caller.name, t: 0, life: 2.4 });
+  state.effects.push({ type: 'liarPortrait', sprite: caller.sprite, name: caller.name, t: 0, life: 2.4 });
+  const cs = caller.seat || { x: SCENE.W/2, y: 165 };
+  state.effects.push({ type: 'shockwave', fromX: SCENE.TABLE.cx, fromY: SCENE.TABLE.cy, t: 0, life: 0.9 });
+  AUDIO.tableThump();
+  for (let i = 0; i < 18; i++) {
+    state.particles.push({
+      x: cs.x + (Math.random()-0.5)*8, y: cs.y - 8,
+      vx: (Math.random()-0.5)*60, vy: -10 - Math.random()*30,
+      life: 0.7 + Math.random()*0.4, age: 0,
+      color: ['#a89878','#8a7858','#604838'][Math.floor(Math.random()*3)],
+    });
+  }
+  state.screenShake = 1.4;
+  state.boatRock = 1.0;
+  state.flashColor = { r: 240, g: 60, b: 30, a: 0.40, t: 0.6 };
+  state.crewGasp = 1.0; state.crewReact = 1.0;
+  SCENE.flash();
+  setTimeout(() => SCENE.flash(), 220);
+  state.phase = 'reveal';
+  const dicePerPlayer = {};
+  for (const p of state.players) if (p.alive) dicePerPlayer[p.id] = [...p.dice];
+  const actual = countMatches(state.bid.face);
+  const claimed = state.bid.qty;
+  const bidderTruthful = actual >= claimed;
+  const loser = bidderTruthful ? caller : bidder;
+  // Build scatter trajectory for every die — they'll fly from each player's
+  // cup onto the table center in arcing parabolas, then settle.
+  const scatter = [];
+  const T = SCENE.TABLE;
+  const innerRx = T.rx - 28;
+  const innerRy = T.ry - 18;
+  for (const p of state.players) {
+    if (!p.alive) continue;
+    const cupCenterX = p.seat.cupX + 15;
+    const cupCenterY = p.seat.cupY + 13;
+    for (let di = 0; di < p.dice.length; di++) {
+      const face = p.dice[di];
+      const isMatch = (face === state.bid.face) ||
+                      (state.bid.face !== 1 && face === 1);
+      // Random target inside the inner table ellipse
+      let tx, ty;
+      for (let tries = 0; tries < 8; tries++) {
+        const r = Math.sqrt(Math.random());
+        const ang = Math.random() * Math.PI * 2;
+        tx = T.cx + Math.cos(ang) * innerRx * r;
+        ty = T.cy + Math.sin(ang) * innerRy * r;
+        // Avoid overlapping previously placed dice
+        let ok = true;
+        for (const s of scatter) {
+          if (Math.hypot(s.toX - tx, s.toY - ty) < 16) { ok = false; break; }
+        }
+        if (ok) break;
+      }
+      // Stagger launch by player + die index so the spill cascades
+      const playerIdx = state.players.indexOf(p);
+      const launchT = 0.45 + playerIdx*0.07 + di*0.05;
+      scatter.push({
+        playerId: p.id,
+        dieIdx: di,
+        face,
+        isMatch,
+        fromX: cupCenterX,
+        fromY: cupCenterY,
+        toX: tx,
+        toY: ty,
+        rot: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random()-0.5) * 12,
+        launchT,
+        flightDur: 0.55 + Math.random()*0.15,
+      });
+    }
+  }
+  state.reveal = {
+    dicePerPlayer, t: 0, claimed, actual,
+    face: state.bid.face,
+    bidder, caller, loser,
+    truth: bidderTruthful,
+    scatter,
+    countDisplay: 0, // animates up to `actual`
+  };
+  AUDIO.dice();
+  setTimeout(() => AUDIO.dice(), 250);
+  setTimeout(() => AUDIO.dice(), 500);
+  updateBanner();
+  setTimeout(() => resolveLiar(), 4200);
+}
+function resolveLiar() {
+  const r = state.reveal;
+  if (!r) return;
+  const loser = r.loser;
+  loser.dice.pop();
+  logEvent(`Actual: ${r.actual} (claimed ${r.claimed}). ${loser.name} loses a die.`, 'liar');
+  showToast(r.truth ? `TRUTH! ${r.caller.name} LOSES A DIE` : `LIAR! ${r.bidder.name} LOSES A DIE`, 2.2);
+  if (loser.dice.length === 0) {
+    loser.alive = false;
+    logEvent(`${loser.name} is OUT! Sent to the deep.`, 'eliminate');
+    AUDIO.loseSting(); AUDIO.wail();
+    const ls = loser.seat || { x: SCENE.W/2, y: 130 };
+    state.effects.push({
+      type: 'soulPull',
+      fromX: ls.x, fromY: ls.y - 10,
+      toX: SCENE.TABLE.cx, toY: SCENE.TABLE.cy,
+      sprite: loser.sprite, name: loser.name,
+      t: 0, life: 3.2,
+    });
+    state.screenShake = Math.max(state.screenShake, 0.6);
+    state.boatRock = Math.max(state.boatRock, 0.7);
+    state.flashColor = { r: 80, g: 180, b: 200, a: 0.4, t: 0.7 };
+    for (let i = 0; i < 30; i++) {
+      state.particles.push({
+        x: ls.x + (Math.random()-0.5)*16,
+        y: ls.y - 4 + (Math.random()-0.5)*8,
+        vx: (Math.random()-0.5)*20,
+        vy: 30 + Math.random()*40,
+        life: 1.2 + Math.random()*0.6, age: 0,
+        color: ['#80ffe0','#a0e0ff','#fff8d0'][Math.floor(Math.random()*3)],
+        kind: 'fall',
+      });
+    }
+  }
+  state.reveal = null;
+  if (state.alivePlayers().length <= 1) {
+    state.phase = 'gameover';
+    const winner = state.alivePlayers()[0];
+    logEvent(`${winner ? winner.name : 'NO ONE'} wins!`, 'win');
+    showToast(`${winner ? winner.name : '???'} WINS!`, 5);
+    AUDIO.winSting();
+    state.flashColor = { r: 255, g: 220, b: 100, a: 0.4, t: 0.8 };
+    for (let i = 0; i < 60; i++) {
+      state.particles.push({
+        x: SCENE.W/2 + (Math.random()-0.5)*40,
+        y: SCENE.H/2,
+        vx: (Math.random()-0.5)*120,
+        vy: -60 - Math.random()*80,
+        life: 1.5 + Math.random()*0.5, age: 0,
+        color: ['#f4d27a','#ffd060','#ffa040','#fff8c0','#80f080'][Math.floor(Math.random()*5)],
+      });
+    }
+    updateBanner();
+    setTimeout(() => showGameOverUI(winner), 2200);
+    return;
+  }
+  // New hand: bidding goes back to zero, everyone reshakes
+  state.round++;
+  state.bid = null;
+  // Reset the human bid stepper so it doesn't carry the prior hand's qty/face as a floor
+  humanBid.qty = 1;
+  humanBid.face = 2;
+  syncStepper();
+  state.phase = 'rolling';
+  rollAll();
+  // The loser of the hand starts the next round's bidding
+  state.current = state.players.indexOf(loser);
+  if (!loser.alive) advanceCurrent();
+  logEvent(`— New hand. ${state.players[state.current].name} opens.`, '');
+  setTimeout(() => { state.phase = 'bidding'; nextTurn(true); }, 1500);
+}
+function doAITurn() {
+  if (state.phase !== 'bidding') return;
+  const p = currentPlayer();
+  if (!p.isAI || !p.alive) return;
+  const decision = aiDecide(p);
+  if (decision.type === 'liar') callLiar();
+  else placeBid(decision.qty, decision.face);
+}
+
+//----------------------------------------------------------------
+// RENDERING — battle-style framing
+//----------------------------------------------------------------
+function drawPlayers(dt) {
+  const ctx = SCENE.ctx;
+  const T = SCENE.TABLE;
+  const online = (state.netMode === 'host' || state.netMode === 'client');
+  // Hot-seat (pass-and-play) only matters when there are multiple humans on ONE device.
+  // Online play has each human on their own device, so it's NEVER hot-seat.
+  const isHotseat = !online && state.players.filter(p => !p.isAI).length >= 2;
+
+  // Identify the front player (the one whose hand we'll show openly).
+  // Online: the local human (matched by peerId).
+  // Local hot-seat: the current player on their reveal turn.
+  // Solo: the only human.
+  let revealPlayer = null;
+  if (online) {
+    revealPlayer = state.players.find(p => p.peerId && p.peerId === NET.myId && p.alive);
+  } else if (!isHotseat) {
+    revealPlayer = state.players.find(p => !p.isAI && p.alive);
+  } else if (state.phase === 'bidding' && state.humanRevealed) {
+    const cur = currentPlayer();
+    if (cur && !cur.isAI && cur.alive) revealPlayer = cur;
+  }
+
+  // Back-row players (everyone whose seat is above the table) drawn first,
+  // then the table-edge bid panel, then front player + their open dice on top.
+  const backRow = state.players.filter(p => p.seat && p.seat.side !== 'front');
+  const frontRow = state.players.filter(p => p.seat && p.seat.side === 'front');
+  // Sort back row by y for natural depth
+  backRow.sort((a,b) => a.seat.y - b.seat.y);
+
+  function drawPlayer(p, scale) {
+    if (!p.seat) return;
+    const s = p.seat;
+    const idx = state.players.indexOf(p);
+    const isCurrent = state.current === idx && state.phase === 'bidding';
+    // Display size is fixed relative to a 16px baseline regardless of source sprite resolution.
+    const spriteSize = 16 * scale;
+    const sx = s.x - spriteSize/2;
+    const sy = s.y - spriteSize;
+    if (!p.alive) ctx.globalAlpha = 0.25;
+    if (isCurrent && p.alive) {
+      const pulse = 0.6 + Math.sin(performance.now()/200) * 0.4;
+      const g = ctx.createRadialGradient(s.x, s.y, 10, s.x, s.y, 50);
+      g.addColorStop(0, `rgba(255,210,80,${0.5*pulse})`);
+      g.addColorStop(1, 'rgba(255,210,80,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(s.x - 50, s.y - 50, 100, 70);
+    }
+    drawSpriteAt(ctx, p.sprite, sx, sy, spriteSize);
+    // Name above sprite
+    ctx.fillStyle = isCurrent ? '#f4d27a' : (p.alive ? '#a88860' : '#6a3030');
+    ctx.font = '7px "Press Start 2P"';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.name, s.x, sy - 8);
+    // Dice-count dots
+    const dots = 5;
+    const startDx = s.x - (dots * 4)/2;
+    for (let i = 0; i < dots; i++) {
+      ctx.fillStyle = i < p.dice.length
+        ? (isCurrent ? '#f4d27a' : '#c89860')
+        : '#3a2410';
+      ctx.fillRect(startDx + i*4, sy - 4, 3, 3);
+    }
+    ctx.textAlign = 'left';
+    ctx.globalAlpha = 1;
+  }
+
+  function drawCupFor(p) {
+    if (!p.seat) return;
+    // The front player's cup would block the camera view of their own sprite.
+    // Their dice are already shown openly in the HUD, so hide their cup during normal play.
+    // (We still show it tipped during reveal so they're part of the spill.)
+    if (p.seat.side === 'front' && state.phase !== 'reveal') return;
+    const lifted = state.phase === 'reveal';
+    const dice = lifted ? state.reveal.dicePerPlayer[p.id] : null;
+    const sh = state.shake[p.id] || 0;
+    const shakeX = sh > 0 ? (Math.random()-0.5)*4 : 0;
+    const shakeY = sh > 0 ? (Math.random()-0.5)*2 : 0;
+    if (!p.alive) ctx.globalAlpha = 0.25;
+    const cupTipped = (state.phase === 'reveal');
+    if (cupTipped) {
+      drawTippedCup(ctx, p.seat.cupX + shakeX, p.seat.cupY + shakeY + 4, p.seat.angle);
+    } else {
+      drawCup(ctx, p.seat.cupX + shakeX, p.seat.cupY + shakeY, false, null, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // 1. Back-row sprites (big, looming behind the table)
+  for (const p of backRow) drawPlayer(p, 3);
+  // 2. Cups for back-row (sit on the table top, near each back seat)
+  for (const p of backRow) drawCupFor(p);
+
+  // 3. During reveal — scattered dice on the table (drawn over the table, under the central panel)
+  if (state.phase === 'reveal' && state.reveal) drawScatteredDice();
+
+  // 4. Center bid / reveal panel — on the table top, between back cups and front
+  drawCenterPanel();
+
+  // 5. Front player sprite — drawn AFTER center panel so the player is in the foreground
+  for (const p of frontRow) drawPlayer(p, 3);
+  // 6. Front cup
+  for (const p of frontRow) drawCupFor(p);
+
+  // 7. Front player's open dice — rendered as DOM in the HUD (#hand-display) so it can never be hidden by the bidding controls.
+  syncHandDisplay(revealPlayer && state.phase !== 'reveal' ? revealPlayer : null);
+
+  // Decay shake
+  for (const id in state.shake) state.shake[id] = Math.max(0, state.shake[id] - dt);
+
+  function drawScatteredDice() {
+    const r = state.reveal;
+    const t = r.t;
+    // Highlight phase begins around t=1.6s
+    const highlightStart = 1.6;
+    for (const s of r.scatter) {
+      const localT = t - s.launchT;
+      if (localT < 0) continue; // not launched yet
+      const flightU = Math.min(1, localT / s.flightDur);
+      const ease = 1 - Math.pow(1 - flightU, 2);
+      // Parabolic arc: lift up then land
+      const arcLift = Math.sin(flightU * Math.PI) * 22;
+      const x = s.fromX + (s.toX - s.fromX) * ease;
+      const y = s.fromY + (s.toY - s.fromY) * ease - arcLift;
+      // Spinning while in the air, settle on land
+      const settled = flightU >= 1;
+      // Drop-shadow on the table at the destination
+      if (flightU > 0.05) {
+        const shadowAlpha = 0.4 * Math.min(1, flightU * 1.5);
+        ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+        const shX = s.toX - 5;
+        const shY = s.toY + 6;
+        ctx.fillRect(shX, shY, 12, 3);
+      }
+      // Highlight matching dice once settled and t > highlightStart
+      const isHighlighting = settled && s.isMatch && t > highlightStart;
+      const pulse = 0.5 + Math.sin((t - highlightStart) * 6) * 0.5;
+      if (isHighlighting) {
+        const glowColor = r.truth ? 'rgba(120, 240, 120,' : 'rgba(255, 200, 80,';
+        ctx.fillStyle = glowColor + (0.5 * pulse) + ')';
+        ctx.fillRect(x - 5, y - 5, 22, 22);
+        ctx.fillStyle = glowColor + (0.85 * pulse) + ')';
+        ctx.fillRect(x - 2, y - 2, 16, 16);
+      }
+      // Draw the die — spin while airborne by slight x-jitter (no real rotation in pixel art)
+      const wobble = settled ? 0 : Math.sin((t + s.rot) * 24) * 1;
+      drawDie(ctx, Math.round(x + wobble), Math.round(y), s.face, 12, false, s.face===1);
+    }
+  }
+
+  function drawCenterPanel() {
+    if (state.bid && state.phase !== 'reveal') {
+      // Compact bid badge — sits at top-center of the table, well clear of the player.
+      const cx = T.cx, cy = T.cy - 32;
+      const w = 60, h = 16;
+      ctx.fillStyle = 'rgba(10,6,2,0.92)';
+      ctx.fillRect(cx - w/2, cy - h/2, w, h);
+      ctx.strokeStyle = '#a07020';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx - w/2 + 0.5, cy - h/2 + 0.5, w - 1, h - 1);
+      ctx.fillStyle = '#f4d27a';
+      ctx.font = '6px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${state.bid.qty} ×`, cx - 10, cy + 2);
+      ctx.textAlign = 'left';
+      drawDie(ctx, cx + 2, cy - 5, state.bid.face, 10, false, state.bid.face===1);
+    }
+    if (state.phase === 'reveal' && state.reveal) {
+      // Reveal panel sits ABOVE the table so it doesn't cover the scattered dice.
+      const r = state.reveal;
+      const cx = T.cx, cy = 86; // up near the wall
+      const w = 220, h = 44;
+      // Animated border color
+      const showVerdict = r.t >= 3.0;
+      ctx.fillStyle = 'rgba(10,4,2,0.94)';
+      ctx.fillRect(cx - w/2, cy - h/2, w, h);
+      ctx.strokeStyle = showVerdict ? (r.truth ? '#80c040' : '#f04040') : '#6a4020';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cx - w/2 + 1, cy - h/2 + 1, w - 2, h - 2);
+      // Title
+      ctx.fillStyle = '#f4d27a';
+      ctx.font = '8px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillText(`CLAIMED ${r.claimed} × ${r.face}${r.face===1?' (ones wild)':''}`, cx, cy - 8);
+      // Tally — counts up live as dice settle
+      const tallyDisp = r.countDisplay;
+      let actualColor = '#f4d27a';
+      if (showVerdict) actualColor = r.truth ? '#80f080' : '#f08040';
+      ctx.fillStyle = actualColor;
+      ctx.font = '11px "Press Start 2P"';
+      ctx.fillText(`ACTUAL: ${tallyDisp}`, cx, cy + 8);
+      // Verdict stamp
+      if (showVerdict) {
+        const stampPulse = 0.7 + Math.sin(r.t * 6) * 0.3;
+        ctx.fillStyle = r.truth ? `rgba(120,240,120,${stampPulse})` : `rgba(255,80,40,${stampPulse})`;
+        ctx.font = '7px "Press Start 2P"';
+        ctx.fillText(r.truth ? '— TRUTH —' : '— LIAR! —', cx, cy + h/2 + 9);
+      }
+      ctx.textAlign = 'left';
+    }
+  }
+}
+
+// A small empty cup tipped on its side, used during reveal — same gritty palette.
+function drawTippedCup(ctx, x, y, angle) {
+  const w = 26, h = 14;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x - 1, y + h, w + 2, 3);
+  // Body
+  ctx.fillStyle = '#1a0e08';
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#3a2418';
+  ctx.fillRect(x, y, w, 1);
+  ctx.fillRect(x, y, 1, h);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(x, y + h - 1, w, 1);
+  ctx.fillRect(x + w - 1, y, 1, h);
+  // Dark mouth — dynamic facing
+  const opensRight = Math.cos(angle) > 0;
+  const mouthX = opensRight ? x + w - 4 : x;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(mouthX, y + 2, 4, h - 4);
+  ctx.fillStyle = '#0a0604';
+  ctx.fillRect(opensRight ? mouthX - 1 : mouthX + 4, y + 2, 1, h - 4);
+  // Iron strap
+  ctx.fillStyle = '#0a0604';
+  ctx.fillRect(x + 2, y + Math.round(h*0.5), w - 4, 2);
+  ctx.fillStyle = '#3a2410';
+  ctx.fillRect(x + 2, y + Math.round(h*0.5), w - 4, 1);
+  // Encrustation — barnacles + moss
+  ctx.fillStyle = '#3a4030';
+  ctx.fillRect(x + 4, y - 1, 2, 1);
+  ctx.fillRect(x + w - 8, y - 1, 2, 1);
+  ctx.fillStyle = '#1a2a12';
+  ctx.fillRect(x + 6, y + h - 3, 4, 1);
+}
+
+// Front-player open dice strip — rendered as a wooden ledge across the very bottom
+// of the canvas, above where the HUD controls overlay can reach.
+// Sync the DOM "yer hand" panel above the bid controls so the player can always
+// see their open dice — guaranteed not to be occluded by the canvas or controls.
+function syncHandDisplay(player) {
+  const panel = document.getElementById('hand-display');
+  if (!panel) return;
+  if (!player) {
+    panel.classList.add('hidden');
+    panel._lastSig = null;
+    return;
+  }
+  panel.classList.remove('hidden');
+  const label = document.getElementById('hand-label');
+  if (label) label.textContent = `${player.name} — YER HAND`;
+  const sig = player.id + ':' + player.dice.join(',');
+  if (panel._lastSig === sig) return; // skip re-render if unchanged
+  panel._lastSig = sig;
+  const wrap = document.getElementById('hand-dice');
+  wrap.innerHTML = '';
+  for (const face of player.dice) {
+    const c = document.createElement('canvas');
+    // Render at 18px so pips are 4px (clearly legible) and CSS scales 18→36
+    c.width = 18; c.height = 18;
+    const cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    drawDie(cx, 0, 0, face, 18, false, face===1);
+    wrap.appendChild(c);
+  }
+}
+
+function drawParticles(dt) {
+  const ctx = SCENE.ctx;
+  for (let i = state.particles.length - 1; i >= 0; i--) {
+    const p = state.particles[i];
+    p.age += dt;
+    if (p.age >= p.life) { state.particles.splice(i, 1); continue; }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    if (p.kind === 'ember') p.vy -= 16 * dt;
+    else p.vy += 30 * dt;
+    const alpha = Math.max(0, 1 - p.age/p.life);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(p.x|0, p.y|0, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawEffects(dt) {
+  const ctx = SCENE.ctx;
+  for (let i = state.effects.length - 1; i >= 0; i--) {
+    const e = state.effects[i];
+    e.t += dt;
+    if (e.t >= e.life) { state.effects.splice(i, 1); continue; }
+    if (e.type === 'bidCard') {
+      const u = Math.min(1, e.t / 0.45);
+      const ease = 1 - Math.pow(1-u, 3);
+      const x = e.fromX + (e.toX - e.fromX) * ease;
+      const y = e.fromY + (e.toY - e.fromY) * ease;
+      const fade = e.t > e.life - 0.4 ? Math.max(0, (e.life - e.t)/0.4) : 1;
+      ctx.globalAlpha = fade;
+      const cardW = 50, cardH = 18;
+      ctx.fillStyle = '#1a0a04';
+      ctx.fillRect(x - cardW/2, y - cardH/2, cardW, cardH);
+      ctx.strokeStyle = '#f4d27a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x - cardW/2 + 0.5, y - cardH/2 + 0.5, cardW-1, cardH-1);
+      ctx.fillStyle = '#f4d27a';
+      ctx.font = '7px "Press Start 2P"';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${e.qty}×`, x - cardW/2 + 4, y + 3);
+      drawDie(ctx, x + 4, y - 6, e.face, 12, false, e.face===1);
+      ctx.globalAlpha = 1;
+    }
+    if (e.type === 'shockwave') {
+      const u = Math.min(1, e.t / e.life);
+      const radius = u * 240;
+      const fade = Math.max(0, 1 - u);
+      ctx.save();
+      ctx.globalAlpha = fade * 0.85;
+      for (let r = 0; r < 3; r++) {
+        const rad = radius - r*8;
+        if (rad <= 0) continue;
+        ctx.strokeStyle = ['#fff8d0','#f4d27a','#a07020'][r];
+        ctx.lineWidth = 2 - r*0.5;
+        ctx.beginPath();
+        ctx.ellipse(e.fromX, e.fromY, rad, rad*0.45, 0, 0, Math.PI*2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (e.type === 'soulPull') {
+      const u = e.t / e.life;
+      let gx, gy, gs, ga;
+      if (u < 0.4) {
+        const v = u/0.4;
+        gx = e.fromX; gy = e.fromY - v*22;
+        gs = 2 + v*0.6; ga = v*0.85;
+      } else if (u < 0.85) {
+        const v = (u-0.4)/0.45;
+        gx = e.fromX + (e.toX-e.fromX)*v;
+        gy = (e.fromY-22) + (e.toY-(e.fromY-22))*(v*v);
+        gs = 2.6 - v*1.4; ga = 0.85*(1 - v*0.4);
+      } else {
+        const v = (u-0.85)/0.15;
+        gx = e.toX; gy = e.toY;
+        gs = Math.max(0.1, 1 - v); ga = Math.max(0, 0.5 - v);
+      }
+      ctx.save();
+      ctx.globalAlpha = ga;
+      const sz = 16 * gs;
+      drawSpriteAt(ctx, e.sprite, (gx - sz/2)|0, (gy - sz/2)|0, Math.max(1, sz|0));
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(120,255,220,${ga*0.5})`;
+      ctx.fillRect((gx-sz/2)|0, (gy-sz/2)|0, sz, sz);
+      ctx.restore();
+      if (Math.random() < 0.6 && u < 0.95) {
+        state.particles.push({
+          x: gx + (Math.random()-0.5)*4, y: gy + (Math.random()-0.5)*4,
+          vx: (Math.random()-0.5)*8, vy: -5 - Math.random()*10,
+          life: 0.5 + Math.random()*0.4, age: 0,
+          color: ['#80ffe0','#a0e0ff','#80c0d0'][Math.floor(Math.random()*3)],
+          kind: 'fall',
+        });
+      }
+    }
+    if (e.type === 'liarPortrait') {
+      const popIn = Math.min(1, e.t / 0.18);
+      const ease = 1 - Math.pow(1-popIn, 3);
+      const fade = e.t > e.life - 0.5 ? Math.max(0, (e.life - e.t)/0.5) : 1;
+      const panelW = 70, panelH = 76;
+      const panelX = 16 + (1-ease)*(-panelW);
+      const panelY = SCENE.H/2 - panelH/2 + 6;
+      const shx = (Math.random()-0.5) * 2 * (e.t < 0.6 ? 1 : 0);
+      const shy = (Math.random()-0.5) * 2 * (e.t < 0.6 ? 1 : 0);
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = '#0a0604';
+      ctx.fillRect(panelX + shx, panelY + shy, panelW, panelH);
+      ctx.strokeStyle = '#ff3010';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(panelX + shx + 1, panelY + shy + 1, panelW-2, panelH-2);
+      ctx.fillStyle = 'rgba(20,60,40,0.5)';
+      ctx.fillRect(panelX + shx + 4, panelY + shy + 4, panelW - 8, panelH - 8);
+      const portraitX = panelX + shx + (panelW - 32)/2;
+      const portraitY = panelY + shy + (panelH - 44)/2;
+      drawSpriteAt(ctx, e.sprite, portraitX, portraitY, 32);
+      ctx.fillStyle = '#ff5030';
+      ctx.font = '5px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.name, panelX + shx + panelW/2, panelY + shy + panelH - 4);
+      ctx.textAlign = 'left';
+      if (e.t > 0.05) {
+        const bubbleX = panelX + panelW + 4 + shx;
+        const bubbleY = panelY + 6 + shy;
+        const bubbleW = 100, bubbleH = 32;
+        ctx.fillStyle = '#fff8d0';
+        ctx.fillRect(bubbleX, bubbleY, bubbleW, bubbleH);
+        ctx.fillStyle = '#1a0a04';
+        ctx.fillRect(bubbleX, bubbleY, bubbleW, 1);
+        ctx.fillRect(bubbleX, bubbleY+bubbleH-1, bubbleW, 1);
+        ctx.fillRect(bubbleX, bubbleY, 1, bubbleH);
+        ctx.fillRect(bubbleX+bubbleW-1, bubbleY, 1, bubbleH);
+        ctx.fillStyle = '#fff8d0';
+        ctx.fillRect(bubbleX-4, bubbleY+12, 4, 8);
+        ctx.fillStyle = '#1a0a04';
+        ctx.fillRect(bubbleX-4, bubbleY+12, 1, 8);
+        ctx.fillRect(bubbleX-4, bubbleY+12, 4, 1);
+        ctx.fillRect(bubbleX-4, bubbleY+19, 4, 1);
+        const txtShake = e.t < 0.9 ? (Math.random()-0.5)*1.5 : 0;
+        ctx.fillStyle = '#c01010';
+        ctx.font = '16px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.fillText('LIAR!', bubbleX + bubbleW/2 + txtShake, bubbleY + 22 + txtShake);
+        ctx.textAlign = 'left';
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (e.type === 'liarSlam') {
+      const u = Math.min(1, e.t / 0.25);
+      const ease = 1 - Math.pow(1-u, 4);
+      const fade = e.t > e.life - 0.5 ? Math.max(0, (e.life - e.t)/0.5) : 1;
+      const yBase = -40 + (110 + 40) * ease;
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, yBase - 16, SCENE.W, 32);
+      ctx.fillStyle = '#ff3010';
+      ctx.fillRect(0, yBase - 16, SCENE.W, 1);
+      ctx.fillRect(0, yBase + 15, SCENE.W, 1);
+      ctx.font = '24px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      const sx = (Math.random()-0.5)*4;
+      ctx.fillStyle = '#601010';
+      ctx.fillText('LIAR!', SCENE.W/2 + 2 + sx, yBase + 8);
+      ctx.fillStyle = '#ff4030';
+      ctx.fillText('LIAR!', SCENE.W/2 + sx, yBase + 6);
+      ctx.fillStyle = '#ffe080';
+      ctx.font = '7px "Press Start 2P"';
+      ctx.fillText(`— ${e.name} CALLS IT —`, SCENE.W/2, yBase + 22);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+let lastT = performance.now();
+function loop(t) {
+  const dt = Math.min(0.05, (t - lastT)/1000);
+  lastT = t;
+  state.screenShake = Math.max(0, state.screenShake - dt*1.5);
+  state.crewReact = Math.max(0, state.crewReact - dt*0.7);
+  state.crewGasp = Math.max(0, state.crewGasp - dt*1.6);
+  state.boatRock = Math.max(0, state.boatRock - dt*0.8);
+  if (state.reveal) {
+    state.reveal.t += dt;
+    // Tally count animates up between t=2.0s and t=3.0s
+    const tallyT = Math.max(0, Math.min(1, (state.reveal.t - 2.0) / 1.0));
+    state.reveal.countDisplay = Math.floor(tallyT * state.reveal.actual);
+  }
+  if (state.flashColor) {
+    state.flashColor.t -= dt;
+    if (state.flashColor.t <= 0) state.flashColor = null;
+  }
+  const ctx = SCENE.ctx;
+  ctx.save();
+  if (state.screenShake > 0 || state.boatRock > 0) {
+    const s = state.screenShake;
+    const rock = state.boatRock;
+    ctx.translate(SCENE.W/2, SCENE.H/2);
+    if (rock > 0) ctx.rotate(Math.sin(performance.now()/120) * 0.10 * rock);
+    ctx.translate(-SCENE.W/2, -SCENE.H/2);
+    if (s > 0) ctx.translate((Math.random()-0.5)*5*s, (Math.random()-0.5)*5*s);
+  }
+  if (state.appPhase === 'title') {
+    SCENE.drawTitle(dt);
+  } else {
+    SCENE.drawScene(dt);
+    if (state.phase !== 'menu') drawPlayers(dt);
+  }
+  drawParticles(dt);
+  drawEffects(dt);
+  ctx.restore();
+  if (state.flashColor) {
+    const f = state.flashColor;
+    const a = f.a * Math.max(0, f.t / 0.6);
+    ctx.fillStyle = `rgba(${f.r},${f.g},${f.b},${a})`;
+    ctx.fillRect(0, 0, SCENE.W, SCENE.H);
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+//----------------------------------------------------------------
+// MENU
+//----------------------------------------------------------------
+const selectedAIs = new Set();
+let selectedAvatar = AVATARS[0];
+
+function buildAvatarGrid(opts={}) {
+  const grid = document.getElementById('avatar-grid');
+  grid.innerHTML = '';
+  const taken = opts.taken || new Set();
+  for (const a of AVATARS) {
+    const card = document.createElement('div');
+    card.className = 'ai-card';
+    if (taken.has(a.id)) card.classList.add('locked');
+    card.dataset.id = a.id;
+    const c = document.createElement('canvas');
+    c.width = 32; c.height = 32;
+    const cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    drawSpriteAt(cx, a.sprite, 0, 0, 32);
+    card.appendChild(c);
+    const nm = document.createElement('div'); nm.className = 'ai-name'; nm.textContent = a.name;
+    card.appendChild(nm);
+    const tg = document.createElement('div'); tg.className = 'ai-tag'; tg.textContent = a.tag || '';
+    card.appendChild(tg);
+    card.onclick = () => {
+      if (card.classList.contains('locked')) { showToast('ALREADY CHOSEN BY ANOTHER'); return; }
+      AUDIO.init(); AUDIO.blip(880, 0.05);
+      if (opts.onPick) {
+        opts.onPick(a, card);
+      } else {
+        selectedAvatar = a;
+        grid.querySelectorAll('.ai-card').forEach(el => el.classList.remove('selected'));
+        card.classList.add('selected');
+        refreshStartBtn();
+      }
+    };
+    grid.appendChild(card);
+  }
+  if (!opts.onPick) {
+    const def = grid.querySelector(`[data-id="${selectedAvatar.id}"]`) || grid.querySelector('.ai-card');
+    if (def) def.classList.add('selected');
+  }
+}
+
+function buildAIGrid() {
+  const grid = document.getElementById('ai-grid');
+  grid.innerHTML = '';
+  for (const p of PIRATES) {
+    const card = document.createElement('div');
+    card.className = 'ai-card';
+    card.dataset.id = p.id;
+    const c = document.createElement('canvas');
+    c.width = 32; c.height = 32;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    drawSpriteAt(ctx, p.sprite, 0, 0, 32);
+    card.appendChild(c);
+    const nm = document.createElement('div'); nm.className = 'ai-name'; nm.textContent = p.name; card.appendChild(nm);
+    const tr = document.createElement('div'); tr.className = 'ai-trait'; tr.textContent = p.trait; card.appendChild(tr);
+    card.onclick = () => {
+      AUDIO.init(); AUDIO.blip(660, 0.05);
+      const maxAIs = state.mode === 'solo' ? 5 : Math.max(0, 6 - state.numHumans);
+      if (selectedAIs.has(p.id)) {
+        selectedAIs.delete(p.id);
+        card.classList.remove('selected');
+      } else {
+        if (selectedAIs.size >= maxAIs) { showToast(`MAX ${maxAIs} OPPONENTS`); return; }
+        selectedAIs.add(p.id);
+        card.classList.add('selected');
+      }
+      refreshStartBtn();
+    };
+    grid.appendChild(card);
+  }
+}
+function refreshStartBtn() {
+  if (state.mode === 'solo') {
+    document.getElementById('btn-start').disabled = selectedAIs.size === 0 || !selectedAvatar;
+  } else {
+    const total = state.numHumans + selectedAIs.size;
+    document.getElementById('btn-start').disabled = total < 2 || total > 6;
+  }
+}
+function applyMode(m) {
+  state.mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  const isMulti = m === 'multi';
+  document.getElementById('multi-config').style.display = isMulti ? 'block' : 'none';
+  document.getElementById('avatar-section').style.display = isMulti ? 'none' : 'block';
+  document.getElementById('name-section').style.display = isMulti ? 'none' : 'block';
+  const maxAIs = isMulti ? Math.max(0, 6 - state.numHumans) : 5;
+  document.getElementById('opponent-label').textContent =
+    isMulti ? `AI OPPONENTS (0-${maxAIs}, OPTIONAL)` : 'CHOOSE YER OPPONENTS (1-5)';
+  while (selectedAIs.size > maxAIs) {
+    const first = selectedAIs.values().next().value;
+    selectedAIs.delete(first);
+  }
+  for (const el of document.querySelectorAll('#ai-grid .ai-card')) {
+    el.classList.toggle('selected', selectedAIs.has(el.dataset.id));
+  }
+  refreshStartBtn();
+}
+function setupMenu() {
+  buildAvatarGrid();
+  buildAIGrid();
+  for (const id of ['davy','bootstrap','maccus']) {
+    selectedAIs.add(id);
+    const c = document.querySelector(`#ai-grid [data-id="${id}"]`);
+    if (c) c.classList.add('selected');
+  }
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.onclick = () => { AUDIO.init(); AUDIO.blip(550, 0.05); applyMode(btn.dataset.mode); };
+  });
+  document.getElementById('humans-down').onclick = () => {
+    if (state.numHumans > 2) {
+      state.numHumans--;
+      document.getElementById('humans-val').textContent = state.numHumans;
+      applyMode('multi'); AUDIO.blip(330, 0.04);
+    }
+  };
+  document.getElementById('humans-up').onclick = () => {
+    if (state.numHumans < 5) {
+      state.numHumans++;
+      document.getElementById('humans-val').textContent = state.numHumans;
+      applyMode('multi'); AUDIO.blip(440, 0.04);
+    }
+  };
+  document.getElementById('btn-back').onclick = () => { AUDIO.blip(330, 0.05); showTitle(); };
+  document.getElementById('btn-start').onclick = () => {
+    AUDIO.init();
+    if (state.mode === 'solo') {
+      startGameSolo(document.getElementById('player-name').value, [...selectedAIs], selectedAvatar);
+    } else {
+      state.humanAvatars = []; state.humanNames = []; state.pickIndex = 0;
+      startCharPicking([...selectedAIs]);
+    }
+  };
+  applyMode('solo');
+}
+
+function showGameOverUI(winner) {
+  const ov = document.getElementById('gameover-overlay');
+  document.getElementById('go-winner').textContent = winner ? winner.name : '???';
+  const cv = document.getElementById('go-portrait');
+  cv.width = 32; cv.height = 32;
+  const cx = cv.getContext('2d');
+  cx.imageSmoothingEnabled = false;
+  cx.clearRect(0,0,32,32);
+  if (winner) drawSpriteAt(cx, winner.sprite, 0, 0, 32);
+  ov.classList.remove('hidden');
+}
+function hideGameOverUI() { document.getElementById('gameover-overlay').classList.add('hidden'); }
+function resetForNewGame() {
+  hideGameOverUI();
+  state.players = [];
+  state.bid = null;
+  state.phase = 'menu';
+  state.round = 0;
+  state.current = 0;
+  state.effects = [];
+  state.particles = [];
+  state.shake = {};
+  state.reveal = null;
+  state.crewReact = 0; state.crewGasp = 0; state.boatRock = 0;
+  state.screenShake = 0; state.flashColor = null;
+  state.log = [];
+  renderLog();
+}
+function showTitle() {
+  state.appPhase = 'title';
+  document.getElementById('title-screen').classList.remove('hidden');
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('curtain').classList.add('hidden');
+  document.getElementById('gameover-overlay').classList.add('hidden');
+}
+function showSetup() {
+  state.appPhase = 'setup';
+  document.getElementById('title-screen').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('curtain').classList.add('hidden');
+  document.getElementById('gameover-overlay').classList.add('hidden');
+  const startBtn = document.getElementById('btn-start');
+  if (startBtn) startBtn.textContent = 'SET SAIL';
+  applyMode(state.mode);
+  const oppSec = document.getElementById('opponent-label').parentElement;
+  if (oppSec) oppSec.style.display = '';
+}
+
+document.getElementById('btn-new-game').onclick = () => { AUDIO.init(); AUDIO.blip(880, 0.08); showSetup(); };
+document.getElementById('btn-play-again').onclick = () => { AUDIO.blip(660, 0.06); resetForNewGame(); showSetup(); };
+document.getElementById('btn-back-title').onclick = () => { AUDIO.blip(440, 0.06); resetForNewGame(); showTitle(); };
+
+setupMenu();
+showTitle();
+
+function startCharPicking(aiIds) {
+  state.appPhase = 'pickChars';
+  document.getElementById('multi-config').style.display = 'none';
+  document.getElementById('opponent-label').parentElement.style.display = 'none';
+  document.getElementById('avatar-section').style.display = 'block';
+  document.getElementById('name-section').style.display = 'block';
+  document.getElementById('btn-start').textContent = 'CONFIRM';
+  document.getElementById('btn-start').disabled = false;
+  document.querySelector('#menu h1').textContent = `PLAYER ${state.pickIndex+1} — PICK YER CAPTAIN`;
+  const taken = new Set(state.humanAvatars.map(a=>a.id));
+  let chosen = null;
+  buildAvatarGrid({
+    taken,
+    onPick: (a, card) => {
+      chosen = a;
+      document.querySelectorAll('#avatar-grid .ai-card').forEach(el => el.classList.remove('selected'));
+      card.classList.add('selected');
+    },
+  });
+  document.getElementById('avatar-label').textContent = `PLAYER ${state.pickIndex+1} OF ${state.numHumans}`;
+  document.getElementById('player-name').value = '';
+  document.getElementById('player-name').placeholder = `PLAYER ${state.pickIndex+1} NAME (OPTIONAL)`;
+  document.getElementById('btn-start').onclick = () => {
+    if (!chosen) { showToast('PICK A CAPTAIN!'); return; }
+    state.humanAvatars.push(chosen);
+    state.humanNames.push(document.getElementById('player-name').value);
+    state.pickIndex++;
+    if (state.pickIndex < state.numHumans) startCharPicking(aiIds);
+    else {
+      document.getElementById('btn-start').textContent = 'SET SAIL';
+      document.getElementById('btn-start').onclick = () => {};
+      startGameMulti(state.humanAvatars, state.humanNames, aiIds);
+    }
+  };
+}
+
+//----------------------------------------------------------------
+// HUD CONTROLS
+//----------------------------------------------------------------
+const humanBid = { qty: 1, face: 2 };
+const faceCanv = document.getElementById('face-icon');
+function syncStepper() {
+  document.getElementById('qty-val').textContent = humanBid.qty;
+  drawFaceIcon(faceCanv, humanBid.face);
+}
+document.getElementById('qty-down').onclick = () => {
+  const min = state.bid ? state.bid.qty : 1;
+  if (humanBid.qty > min) { humanBid.qty--; syncStepper(); AUDIO.blip(330,0.04); }
+};
+document.getElementById('qty-up').onclick = () => {
+  const max = state.totalDice();
+  if (humanBid.qty < max) { humanBid.qty++; syncStepper(); AUDIO.blip(440,0.04); }
+};
+document.getElementById('face-down').onclick = () => {
+  if (humanBid.face > 1) { humanBid.face--; syncStepper(); AUDIO.blip(330,0.04); }
+};
+document.getElementById('face-up').onclick = () => {
+  if (humanBid.face < 6) { humanBid.face++; syncStepper(); AUDIO.blip(440,0.04); }
+};
+document.getElementById('btn-bid').onclick = () => {
+  if (placeBid(humanBid.qty, humanBid.face)) {
+    humanBid.qty = state.bid.qty;
+    humanBid.face = state.bid.face + 1;
+    if (humanBid.face > 6) { humanBid.face = 2; humanBid.qty++; }
+    syncStepper();
+  }
+};
+document.getElementById('btn-liar').onclick = () => callLiar();
+document.getElementById('audio-toggle').onclick = () => {
+  AUDIO.init();
+  AUDIO.setMuted(!AUDIO.muted);
+  document.getElementById('audio-toggle').textContent = '[ MUSIC: ' + (AUDIO.muted ? 'OFF' : 'ON') + ' ]';
+};
+syncStepper();
+document.addEventListener('keydown', (e) => {
+  if (state.phase !== 'bidding') return;
+  if (currentPlayer().isAI) return;
+  if (e.key === 'b' || e.key === 'B') document.getElementById('btn-bid').click();
+  if (e.key === 'l' || e.key === 'L') document.getElementById('btn-liar').click();
+  if (e.key === 'ArrowUp') document.getElementById('qty-up').click();
+  if (e.key === 'ArrowDown') document.getElementById('qty-down').click();
+  if (e.key === 'ArrowRight') document.getElementById('face-up').click();
+  if (e.key === 'ArrowLeft') document.getElementById('face-down').click();
+});
+
+//=================================================================
+// MULTIPLAYER — Trystero peer-to-peer (no backend required)
+//=================================================================
+// Architecture:
+//   - Host's browser is the authoritative game server for that room.
+//   - Players connect via WebRTC; signaling via public BitTorrent trackers.
+//   - Host runs the game logic, broadcasts redacted state to each client
+//     (clients only see their own dice values during bidding).
+//   - Client UI renders from received state; clicks become 'action' messages.
+//   - Host disconnect = game ends. Acceptable for casual play.
+
+const NET = (() => {
+  // PeerJS — uses peerjs.com's free public broker for WebRTC signaling.
+  // More reliable than BitTorrent-tracker discovery; commonly unblocked.
+  // Host claims a deterministic peer ID derived from the room code so clients
+  // can connect to it directly.
+  const PEER_PREFIX = 'liarsdice-dmc-';
+  let lib = null;
+  let peer = null;
+  let myId = null;
+  let isHost = false;
+  const connections = new Map(); // peerId -> DataConnection
+  const handlers = {};
+  const peerHandlers = { join: [], leave: [] };
+
+  function log(...args) { try { console.log('[NET]', ...args); } catch (e) {} }
+
+  async function load() {
+    if (lib) return lib;
+    log('loading PeerJS module...');
+    // Use esm.sh ESM build of PeerJS.
+    lib = await import('https://esm.sh/peerjs@1.5.4');
+    log('PeerJS loaded');
+    return lib;
+  }
+
+  async function host(roomCode) {
+    const mod = await load();
+    const Peer = mod.default || mod.Peer;
+    isHost = true;
+    const targetId = PEER_PREFIX + roomCode;
+    return new Promise((resolve, reject) => {
+      try { peer = new Peer(targetId, { debug: 1 }); }
+      catch (e) { return reject(e); }
+      let resolved = false;
+      peer.on('open', id => {
+        myId = id;
+        resolved = true;
+        log('host opened with id', id);
+        resolve({ myId, roomCode });
+      });
+      peer.on('error', err => {
+        log('host peer error:', err && err.type, err && err.message);
+        if (!resolved) reject(err);
+      });
+      peer.on('connection', conn => {
+        log('host: incoming connection from', conn.peer);
+        wireConnection(conn);
+      });
+      peer.on('disconnected', () => {
+        log('host disconnected from broker — attempting reconnect');
+        try { peer.reconnect(); } catch (e) {}
+      });
+      // Failsafe timeout
+      setTimeout(() => { if (!resolved) reject(new Error('Broker timeout — try again')); }, 12000);
+    });
+  }
+
+  async function join(roomCode) {
+    const mod = await load();
+    const Peer = mod.default || mod.Peer;
+    isHost = false;
+    const targetId = PEER_PREFIX + roomCode;
+    return new Promise((resolve, reject) => {
+      try { peer = new Peer({ debug: 1 }); }
+      catch (e) { return reject(e); }
+      let resolved = false;
+      peer.on('open', id => {
+        myId = id;
+        log('client opened with id', id, '— connecting to host', targetId);
+        const conn = peer.connect(targetId, { reliable: true, serialization: 'json' });
+        const tConn = setTimeout(() => {
+          if (!resolved) reject(new Error('Could not reach host — check the code'));
+        }, 12000);
+        conn.on('open', () => {
+          clearTimeout(tConn);
+          resolved = true;
+          log('client connected to host');
+          wireConnection(conn);
+          resolve({ myId, roomCode });
+        });
+        conn.on('error', err => {
+          log('client conn error:', err);
+          if (!resolved) reject(err);
+        });
+      });
+      peer.on('error', err => {
+        log('client peer error:', err && err.type, err && err.message);
+        if (!resolved) reject(err);
+      });
+    });
+  }
+
+  function wireConnection(conn) {
+    connections.set(conn.peer, conn);
+    const fireOpen = () => peerHandlers.join.forEach(h => h(conn.peer));
+    if (conn.open) fireOpen();
+    else conn.on('open', fireOpen);
+    conn.on('data', data => {
+      if (!data || typeof data !== 'object') return;
+      const fn = handlers[data.type];
+      if (fn) {
+        try { fn(data.payload, conn.peer); }
+        catch (e) { log('handler error', data.type, e); }
+      }
+    });
+    const fireClose = () => {
+      if (!connections.has(conn.peer)) return;
+      connections.delete(conn.peer);
+      peerHandlers.leave.forEach(h => h(conn.peer));
+    };
+    conn.on('close', fireClose);
+    conn.on('error', err => { log('conn error', err); fireClose(); });
+  }
+
+  function send(name, payload, peerId) {
+    const msg = { type: name, payload };
+    if (peerId) {
+      const c = connections.get(peerId);
+      if (c && c.open) c.send(msg);
+      else log('send: no open connection for', peerId);
+    } else {
+      // Broadcast to all open connections
+      let n = 0;
+      for (const c of connections.values()) {
+        if (c.open) { c.send(msg); n++; }
+      }
+      if (!n) log('send: no peers to broadcast to (action=' + name + ')');
+    }
+  }
+  function on(name, fn) { handlers[name] = fn; }
+  function onPeerJoin(fn) { peerHandlers.join.push(fn); }
+  function onPeerLeave(fn) { peerHandlers.leave.push(fn); }
+  function leave() {
+    for (const c of connections.values()) { try { c.close(); } catch (e) {} }
+    connections.clear();
+    if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+    myId = null; isHost = false;
+    handlers.hello = handlers.lobby = handlers.state = handlers.action = handlers.event = handlers.kick = null;
+    peerHandlers.join.length = 0;
+    peerHandlers.leave.length = 0;
+  }
+
+  return {
+    host, join, send, on, onPeerJoin, onPeerLeave, leave,
+    get myId() { return myId; },
+    get isHost() { return isHost; },
+    get connected() { return !!peer; },
+    get connectionCount() { return connections.size; },
+  };
+})();
+
+//----------------------------------------------------------------
+// ONLINE LOBBY STATE + UI
+//----------------------------------------------------------------
+const ONLINE = {
+  mode: null,            // null | 'host' | 'client'
+  roomCode: null,
+  // For host: map of peerId → { name, avatarId, ready }. 'self' = the host.
+  // For client: same — replicated from host's lobby broadcasts.
+  players: new Map(),
+  myAvatarId: null,
+  myName: null,
+  selectedAIs: new Set(), // host-only; AI ids to seat
+  // Game-time:
+  myPlayerId: null,       // assigned when game starts (matches state.players[i].id)
+};
+
+function generateRoomCode() {
+  // Exclude ambiguous chars (0/O, I/1, etc.)
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+function inviteUrl(code) {
+  const base = location.origin + location.pathname;
+  return base + '#' + code;
+}
+
+function showTitleScreen() {
+  state.appPhase = 'title';
+  document.getElementById('title-screen').classList.remove('hidden');
+  document.getElementById('online-lobby').classList.add('hidden');
+  document.getElementById('online-join').classList.add('hidden');
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('curtain').classList.add('hidden');
+  document.getElementById('gameover-overlay').classList.add('hidden');
+}
+function showOnlineLobby() {
+  document.getElementById('title-screen').classList.add('hidden');
+  document.getElementById('online-join').classList.add('hidden');
+  document.getElementById('online-lobby').classList.remove('hidden');
+  // Toggle host-only / client-only sections
+  for (const el of document.querySelectorAll('.host-only')) {
+    el.classList.toggle('hidden', ONLINE.mode !== 'host');
+  }
+  for (const el of document.querySelectorAll('.client-only')) {
+    el.classList.toggle('hidden', ONLINE.mode !== 'client');
+  }
+  document.getElementById('lobby-code').textContent = ONLINE.roomCode || '------';
+  renderLobbyPlayers();
+  renderLobbyAIGrid();
+}
+function showOnlineJoin() {
+  document.getElementById('title-screen').classList.add('hidden');
+  document.getElementById('online-lobby').classList.add('hidden');
+  document.getElementById('online-join').classList.remove('hidden');
+  document.getElementById('join-code-input').value = '';
+  document.getElementById('join-code-input').focus();
+}
+
+function renderLobbyPlayers() {
+  const wrap = document.getElementById('lobby-players');
+  wrap.innerHTML = '';
+  // Empty state: show a connecting placeholder so it's clear the lobby is alive.
+  if (ONLINE.players.size === 0) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'lobby-help';
+    placeholder.style.padding = '1em';
+    placeholder.style.textAlign = 'center';
+    placeholder.textContent = ONLINE.mode === 'client'
+      ? 'CONNECTING TO HOST...'
+      : 'WAITING FOR PLAYERS TO JOIN...';
+    wrap.appendChild(placeholder);
+    document.getElementById('btn-start-online').disabled = true;
+    return;
+  }
+  // Order: host first, then by joined order (Map iteration order)
+  const entries = [...ONLINE.players.entries()];
+  entries.sort((a, b) => (b[1].isHost ? 1 : 0) - (a[1].isHost ? 1 : 0));
+  for (const [pid, info] of entries) {
+    const row = document.createElement('div');
+    row.className = 'lobby-player-row';
+    if (pid === 'self' || pid === NET.myId) row.classList.add('you');
+    // Avatar canvas
+    const c = document.createElement('canvas');
+    c.width = 32; c.height = 32;
+    const cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    const avatar = AVATARS.find(a => a.id === info.avatarId);
+    if (avatar) drawSpriteAt(cx, avatar.sprite, 0, 0, 32);
+    row.appendChild(c);
+    // Name + tag
+    const meta = document.createElement('div');
+    meta.style.flex = '1';
+    const nm = document.createElement('div');
+    nm.className = 'lobby-player-name';
+    nm.textContent = info.name + (pid === 'self' || pid === NET.myId ? ' (YOU)' : '');
+    meta.appendChild(nm);
+    if (avatar) {
+      const tg = document.createElement('div');
+      tg.className = 'lobby-player-tag';
+      tg.textContent = avatar.name;
+      meta.appendChild(tg);
+    }
+    row.appendChild(meta);
+    // Status
+    const st = document.createElement('div');
+    st.className = 'lobby-player-status';
+    if (info.isHost) { st.textContent = 'HOST'; st.classList.add('host'); }
+    else if (info.ready) { st.textContent = 'READY'; }
+    else { st.textContent = 'PICKING'; st.classList.add('waiting'); }
+    row.appendChild(st);
+    wrap.appendChild(row);
+  }
+  // Update start button enabled state (host only)
+  const startBtn = document.getElementById('btn-start-online');
+  const total = ONLINE.players.size + (ONLINE.mode === 'host' ? ONLINE.selectedAIs.size : 0);
+  const allReady = [...ONLINE.players.values()].every(p => p.isHost || p.ready);
+  startBtn.disabled = !(ONLINE.mode === 'host' && total >= 2 && total <= 6 && allReady);
+}
+
+function renderLobbyAIGrid() {
+  if (ONLINE.mode !== 'host') return;
+  const grid = document.getElementById('lobby-ai-grid');
+  grid.innerHTML = '';
+  for (const p of PIRATES) {
+    const card = document.createElement('div');
+    card.className = 'ai-card';
+    if (ONLINE.selectedAIs.has(p.id)) card.classList.add('selected');
+    const c = document.createElement('canvas');
+    c.width = 32; c.height = 32;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    drawSpriteAt(ctx, p.sprite, 0, 0, 32);
+    card.appendChild(c);
+    const nm = document.createElement('div'); nm.className = 'ai-name'; nm.textContent = p.name; card.appendChild(nm);
+    const tr = document.createElement('div'); tr.className = 'ai-trait'; tr.textContent = p.trait; card.appendChild(tr);
+    card.onclick = () => {
+      AUDIO.init(); AUDIO.blip(660, 0.04);
+      const total = ONLINE.players.size + ONLINE.selectedAIs.size;
+      if (ONLINE.selectedAIs.has(p.id)) {
+        ONLINE.selectedAIs.delete(p.id);
+      } else {
+        if (total >= 6) { showToast('TABLE IS FULL (6 MAX)'); return; }
+        ONLINE.selectedAIs.add(p.id);
+      }
+      renderLobbyAIGrid();
+      renderLobbyPlayers();
+    };
+    grid.appendChild(card);
+  }
+}
+
+//----------------------------------------------------------------
+// HOST FLOW
+//----------------------------------------------------------------
+async function hostNewGame() {
+  AUDIO.init();
+  const code = generateRoomCode();
+  ONLINE.mode = 'host';
+  ONLINE.roomCode = code;
+  ONLINE.players.clear();
+  ONLINE.selectedAIs.clear();
+  history.replaceState(null, '', '#' + code);
+  // Default host avatar — first available
+  ONLINE.myAvatarId = AVATARS[0].id;
+  ONLINE.myName = (await pickName()) || 'HOST';
+  ONLINE.players.set('self', {
+    name: ONLINE.myName,
+    avatarId: ONLINE.myAvatarId,
+    isHost: true,
+    ready: true,
+  });
+  showOnlineLobby();
+  try {
+    await NET.host(code);
+  } catch (e) {
+    showToast('CONNECTION FAILED');
+    console.error(e);
+    return;
+  }
+  // Wire host-side network handlers
+  NET.onPeerJoin(peerId => {
+    // New peer: send them the current lobby snapshot
+    const snapshot = lobbySnapshot();
+    NET.send('lobby', snapshot, peerId);
+  });
+  NET.onPeerLeave(peerId => {
+    if (ONLINE.players.has(peerId)) {
+      ONLINE.players.delete(peerId);
+      broadcastLobby();
+      renderLobbyPlayers();
+      // If game in progress, mark them out
+      if (state.appPhase === 'game') {
+        const p = state.players.find(pl => pl.peerId === peerId);
+        if (p) { p.alive = false; p.dice = []; broadcastState(); }
+      }
+    }
+  });
+  NET.on('hello', (data, peerId) => {
+    // Client introducing themselves with avatar choice + name
+    if (!data || !data.name || !data.avatarId) return;
+    // Avatar uniqueness check
+    const taken = [...ONLINE.players.values()].some(p => p.avatarId === data.avatarId);
+    if (taken) {
+      NET.send('kick', { reason: 'Avatar already taken — pick another.' }, peerId);
+      return;
+    }
+    // Capacity check
+    const total = ONLINE.players.size + ONLINE.selectedAIs.size;
+    if (total >= 6) {
+      NET.send('kick', { reason: 'Table is full.' }, peerId);
+      return;
+    }
+    ONLINE.players.set(peerId, {
+      name: String(data.name).toUpperCase().slice(0, 14),
+      avatarId: data.avatarId,
+      isHost: false,
+      ready: true,
+    });
+    broadcastLobby();
+    renderLobbyPlayers();
+  });
+  NET.on('action', (data, peerId) => {
+    // Client requesting a game action — only allow if it's their turn
+    if (state.appPhase !== 'game' || state.phase !== 'bidding') return;
+    const p = state.players[state.current];
+    if (!p || p.peerId !== peerId) return;
+    if (data.type === 'bid') tryHostBid(data.qty, data.face);
+    else if (data.type === 'liar') tryHostLiar();
+  });
+}
+
+function lobbySnapshot() {
+  const list = [];
+  for (const [pid, info] of ONLINE.players.entries()) {
+    list.push({
+      peerId: pid === 'self' ? NET.myId : pid,
+      name: info.name,
+      avatarId: info.avatarId,
+      isHost: !!info.isHost,
+      ready: !!info.ready,
+    });
+  }
+  return { roomCode: ONLINE.roomCode, players: list, aiIds: [...ONLINE.selectedAIs], hostId: NET.myId };
+}
+function broadcastLobby() {
+  if (ONLINE.mode !== 'host' || !NET.connected) return;
+  NET.send('lobby', lobbySnapshot());
+}
+
+//----------------------------------------------------------------
+// CLIENT FLOW
+//----------------------------------------------------------------
+async function clientJoin(code) {
+  AUDIO.init();
+  ONLINE.mode = 'client';
+  ONLINE.roomCode = code;
+  ONLINE.players.clear();
+  history.replaceState(null, '', '#' + code);
+
+  // Pick avatar + name FIRST, then connect with hello.
+  const choice = await pickAvatarAndName();
+  if (!choice) return;
+  ONLINE.myAvatarId = choice.avatarId;
+  ONLINE.myName = choice.name;
+
+  showOnlineLobby();
+  try {
+    await NET.join(code);
+  } catch (e) {
+    showToast('CONNECTION FAILED');
+    console.error(e);
+    return;
+  }
+  // Send hello as soon as we actually see the host peer connect.
+  // Trystero broadcasts to all peers; we want a guaranteed deliverable hello.
+  let helloSent = false;
+  function sendHello() {
+    if (helloSent) return;
+    helloSent = true;
+    NET.send('hello', { name: ONLINE.myName, avatarId: ONLINE.myAvatarId });
+  }
+  NET.onPeerJoin(() => sendHello());
+  // Failsafe retry — if peer-join hasn't fired within 4s, fire the broadcast hello anyway.
+  setTimeout(() => sendHello(), 4000);
+  // Wire client-side network handlers
+  NET.on('lobby', (data) => {
+    if (!data || !data.players) return;
+    ONLINE.players.clear();
+    for (const p of data.players) {
+      ONLINE.players.set(p.peerId, {
+        name: p.name, avatarId: p.avatarId, isHost: p.isHost, ready: p.ready,
+      });
+    }
+    document.getElementById('lobby-code').textContent = data.roomCode;
+    renderLobbyPlayers();
+  });
+  NET.on('kick', (data) => {
+    showToast(data && data.reason ? data.reason : 'Kicked from lobby.');
+    setTimeout(() => leaveOnline(), 1500);
+  });
+  NET.on('state', (data) => {
+    applyRemoteState(data);
+  });
+  NET.on('event', (data) => {
+    applyRemoteEvent(data);
+  });
+}
+
+// Picker UI overlaying the lobby — uses a temporary modal
+async function pickAvatarAndName() {
+  return new Promise(resolve => {
+    // Use the existing menu structure as a quick char select
+    document.getElementById('menu').classList.remove('hidden');
+    document.querySelector('#menu h1').textContent = 'PICK YER CAPTAIN';
+    document.getElementById('multi-config').style.display = 'none';
+    document.getElementById('opponent-label').parentElement.style.display = 'none';
+    document.getElementById('avatar-section').style.display = 'block';
+    document.getElementById('name-section').style.display = 'block';
+    document.getElementById('avatar-label').textContent = 'CHOOSE YOUR CHARACTER';
+    document.getElementById('player-name').value = '';
+    document.getElementById('player-name').placeholder = 'YOUR NAME';
+    document.getElementById('btn-start').textContent = 'JOIN GAME';
+    document.getElementById('btn-start').disabled = false;
+    let chosen = null;
+    buildAvatarGrid({
+      onPick: (a, card) => {
+        chosen = a;
+        document.querySelectorAll('#avatar-grid .ai-card').forEach(el => el.classList.remove('selected'));
+        card.classList.add('selected');
+      },
+    });
+    const oldStartHandler = document.getElementById('btn-start').onclick;
+    document.getElementById('btn-start').onclick = () => {
+      if (!chosen) { showToast('PICK A CAPTAIN!'); return; }
+      const name = document.getElementById('player-name').value.trim().toUpperCase().slice(0, 14) || chosen.name;
+      document.getElementById('menu').classList.add('hidden');
+      document.getElementById('btn-start').onclick = oldStartHandler;
+      resolve({ avatarId: chosen.id, name });
+    };
+    document.getElementById('btn-back').onclick = () => {
+      document.getElementById('menu').classList.add('hidden');
+      document.getElementById('btn-start').onclick = oldStartHandler;
+      resolve(null);
+    };
+  });
+}
+async function pickName() {
+  return new Promise(resolve => {
+    const name = prompt('Enter your name (host)', 'CAPTAIN');
+    resolve((name || '').toUpperCase().slice(0, 14));
+  });
+}
+
+//----------------------------------------------------------------
+// HOST GAME ACTIONS
+//----------------------------------------------------------------
+function startOnlineGame() {
+  if (ONLINE.mode !== 'host') return;
+  const total = ONLINE.players.size + ONLINE.selectedAIs.size;
+  if (total < 2 || total > 6) { showToast('NEED 2-6 PLAYERS'); return; }
+  // Build players array — host first, then other humans, then AIs
+  state.players = [];
+  // Host (self)
+  const hostAvatar = AVATARS.find(a => a.id === ONLINE.myAvatarId);
+  state.players.push({
+    id: 'p_host', peerId: NET.myId, name: ONLINE.myName,
+    isAI: false, dice: [1,1,1,1,1], alive: true, seat: null,
+    sprite: hostAvatar.sprite, spriteId: hostAvatar.id,
+  });
+  ONLINE.myPlayerId = 'p_host';
+  // Other humans
+  let idx = 1;
+  for (const [peerId, info] of ONLINE.players.entries()) {
+    if (peerId === 'self' || info.isHost) continue;
+    const av = AVATARS.find(a => a.id === info.avatarId);
+    if (!av) continue;
+    state.players.push({
+      id: 'p_' + idx++, peerId, name: info.name,
+      isAI: false, dice: [1,1,1,1,1], alive: true, seat: null,
+      sprite: av.sprite, spriteId: av.id,
+    });
+  }
+  // AIs
+  for (const aiId of ONLINE.selectedAIs) {
+    const proto = PIRATES.find(p => p.id === aiId);
+    if (!proto) continue;
+    state.players.push({
+      id: proto.id, peerId: null, name: proto.name,
+      isAI: true, ai: proto, sprite: proto.sprite, spriteId: proto.id,
+      dice: [1,1,1,1,1], alive: true, seat: null,
+    });
+  }
+  state.netMode = 'host';
+  document.getElementById('online-lobby').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('title-screen').classList.add('hidden');
+  beginGame();
+  broadcastState();
+}
+
+function tryHostBid(qty, face) {
+  if (placeBid(qty, face)) broadcastState();
+}
+function tryHostLiar() {
+  callLiar();
+  broadcastState();
+}
+
+// Build a redacted view of state for a particular client — hides other players' dice during bidding.
+function viewForClient(targetPeerId) {
+  const phase = state.phase;
+  return {
+    appPhase: state.appPhase,
+    phase,
+    round: state.round,
+    current: state.current,
+    bid: state.bid,
+    players: state.players.map(p => ({
+      id: p.id,
+      peerId: p.peerId,
+      name: p.name,
+      isAI: p.isAI,
+      alive: p.alive,
+      spriteId: p.spriteId,
+      seat: p.seat,
+      // Only reveal dice values for the target player or during reveal phase.
+      dice: (phase === 'reveal' || p.peerId === targetPeerId) ? p.dice : new Array(p.dice.length).fill(0),
+    })),
+    reveal: state.reveal ? {
+      claimed: state.reveal.claimed,
+      actual: state.reveal.actual,
+      face: state.reveal.face,
+      truth: state.reveal.truth,
+      bidderId: state.reveal.bidder ? state.reveal.bidder.id : null,
+      callerId: state.reveal.caller ? state.reveal.caller.id : null,
+      loserId: state.reveal.loser ? state.reveal.loser.id : null,
+      // Reveal phase: include all dice
+      dicePerPlayer: state.reveal.dicePerPlayer,
+    } : null,
+    yourPlayerId: (state.players.find(p => p.peerId === targetPeerId) || {}).id,
+  };
+}
+
+function broadcastState() {
+  if (state.netMode !== 'host') return;
+  // Send a per-client view to each connected peer.
+  for (const [peerId] of ONLINE.players.entries()) {
+    if (peerId === 'self') continue;
+    const view = viewForClient(peerId);
+    NET.send('state', view, peerId);
+  }
+}
+
+//----------------------------------------------------------------
+// CLIENT — apply remote state
+//----------------------------------------------------------------
+function applyRemoteState(data) {
+  if (!data || !data.players) return;
+  state.netMode = 'client';
+  state.appPhase = data.appPhase || 'game';
+  // Reconstruct players with sprites looked up locally
+  state.players = data.players.map(rp => {
+    const av = AVATARS.find(a => a.id === rp.spriteId) || PIRATES.find(p => p.id === rp.spriteId);
+    return {
+      id: rp.id, peerId: rp.peerId, name: rp.name,
+      isAI: rp.isAI, alive: rp.alive,
+      seat: rp.seat,
+      dice: rp.dice || [],
+      sprite: av ? av.sprite : '',
+      spriteId: rp.spriteId,
+    };
+  });
+  state.phase = data.phase;
+  state.round = data.round;
+  state.current = data.current;
+  state.bid = data.bid;
+  state.reveal = data.reveal ? {
+    claimed: data.reveal.claimed,
+    actual: data.reveal.actual,
+    face: data.reveal.face,
+    truth: data.reveal.truth,
+    dicePerPlayer: data.reveal.dicePerPlayer || {},
+    // Resolve players by id
+    bidder: state.players.find(p => p.id === data.reveal.bidderId),
+    caller: state.players.find(p => p.id === data.reveal.callerId),
+    loser: state.players.find(p => p.id === data.reveal.loserId),
+    t: 0,
+    scatter: [], // remote doesn't replay scatter; clients see static reveal
+  } : null;
+  ONLINE.myPlayerId = data.yourPlayerId || ONLINE.myPlayerId;
+  // Show game UI
+  document.getElementById('online-lobby').classList.add('hidden');
+  document.getElementById('title-screen').classList.add('hidden');
+  document.getElementById('online-join').classList.add('hidden');
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  // Re-assign seats whenever the player roster changes (joins, eliminations) so
+  // the local player always sits at the front on this device.
+  assignSeats();
+  // Game-over: surface the winner overlay on the client.
+  if (state.phase === 'gameover') {
+    const winner = state.alivePlayers()[0];
+    showGameOverUI(winner);
+  } else {
+    document.getElementById('gameover-overlay').classList.add('hidden');
+  }
+  updateBanner();
+  updateControls();
+}
+
+function applyRemoteEvent(ev) {
+  // For now, only used to relay sound triggers.
+  if (!ev || !ev.kind) return;
+  if (ev.kind === 'bid' && AUDIO.fanfare) AUDIO.fanfare(ev.face || 2);
+  if (ev.kind === 'liar' && AUDIO.slam) AUDIO.slam();
+}
+
+//----------------------------------------------------------------
+// Wrap placeBid / callLiar to route client clicks to the host
+//----------------------------------------------------------------
+const _origPlaceBid = placeBid;
+placeBid = function(qty, face) {
+  if (state.netMode === 'client') {
+    NET.send('action', { type: 'bid', qty, face });
+    return true;
+  }
+  return _origPlaceBid(qty, face);
+};
+const _origCallLiar = callLiar;
+callLiar = function() {
+  if (state.netMode === 'client') {
+    NET.send('action', { type: 'liar' });
+    return;
+  }
+  _origCallLiar();
+};
+
+// After every host-side state mutation we want to sync. Wrap nextTurn/resolveLiar to broadcast.
+const _origNextTurn = nextTurn;
+nextTurn = function(skipAdvance) {
+  _origNextTurn(skipAdvance);
+  if (state.netMode === 'host') broadcastState();
+};
+const _origResolveLiar = resolveLiar;
+resolveLiar = function() {
+  _origResolveLiar();
+  if (state.netMode === 'host') broadcastState();
+};
+
+//----------------------------------------------------------------
+// "Whose turn?" gate — only allow control inputs for the local player
+//----------------------------------------------------------------
+const _origUpdateControls = updateControls;
+updateControls = function() {
+  _origUpdateControls();
+  if (state.netMode === 'client' || state.netMode === 'host') {
+    const cur = currentPlayer();
+    const myTurn = cur && cur.peerId === NET.myId && state.phase === 'bidding' && cur.alive;
+    document.getElementById('btn-bid').disabled = !myTurn;
+    document.getElementById('btn-liar').disabled = !myTurn || !state.bid;
+    // Hand display always shows the local player's hand
+    const me = state.players.find(p => p.peerId === NET.myId);
+    if (me && me.alive && state.phase === 'bidding') {
+      syncHandDisplay(me);
+    } else {
+      syncHandDisplay(null);
+    }
+  }
+};
+
+//----------------------------------------------------------------
+// LOBBY HOOKUP
+//----------------------------------------------------------------
+function leaveOnline() {
+  NET.leave();
+  ONLINE.mode = null;
+  ONLINE.roomCode = null;
+  ONLINE.players.clear();
+  ONLINE.selectedAIs.clear();
+  state.netMode = 'offline';
+  history.replaceState(null, '', location.pathname);
+  resetForNewGame();
+  showTitleScreen();
+}
+
+document.getElementById('btn-host-online').onclick = () => { hostNewGame(); };
+document.getElementById('btn-join-online').onclick = () => { showOnlineJoin(); };
+document.getElementById('btn-back-to-title').onclick = () => { showTitleScreen(); };
+document.getElementById('btn-confirm-join').onclick = () => {
+  const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+  if (!/^[A-Z2-9]{6}$/.test(code)) { showToast('ENTER A VALID 6-CHAR CODE'); return; }
+  clientJoin(code);
+};
+document.getElementById('btn-leave-lobby').onclick = () => { leaveOnline(); };
+document.getElementById('btn-start-online').onclick = () => { startOnlineGame(); };
+document.getElementById('btn-copy-code').onclick = async () => {
+  const url = inviteUrl(ONLINE.roomCode);
+  try { await navigator.clipboard.writeText(url); showToast('LINK COPIED!'); }
+  catch (e) { showToast(url); }
+};
+
+// Auto-join if URL has a hash code.
+// Important: this script runs at end-of-body, so DOMContentLoaded has already
+// fired — registering an event listener for it is too late. Run inline.
+//
+// Hash recovery: Netlify's password-protection (and some redirect chains)
+// strip the URL hash. We persist the last-seen invite code in sessionStorage
+// so a recovery link can still join the room.
+(function () {
+  const STORE_KEY = 'liarsdice.inviteCode';
+  let code = location.hash.replace('#', '').toUpperCase();
+  if (!/^[A-Z2-9]{6}$/.test(code)) {
+    // Fall back to a previously-stashed code (handles auth redirects that strip the hash).
+    try { code = (sessionStorage.getItem(STORE_KEY) || '').toUpperCase(); } catch (e) {}
+  }
+  if (/^[A-Z2-9]{6}$/.test(code)) {
+    try { sessionStorage.setItem(STORE_KEY, code); } catch (e) {}
+    // Hide the title screen instantly so the user doesn't see a flash of "NEW GAME".
+    const ts = document.getElementById('title-screen');
+    if (ts) ts.classList.add('hidden');
+    // Kick off the join flow on next tick so the rest of the script finishes.
+    setTimeout(() => clientJoin(code), 50);
+  }
+})();
+</script>
+</body>
+</html>
