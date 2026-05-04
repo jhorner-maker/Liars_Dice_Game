@@ -30,12 +30,15 @@
   }
   #menu {
     position: fixed; inset: 0;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-start;
     background:
       linear-gradient(to bottom, rgba(0,0,0,0.85), rgba(0,0,0,0.95)),
       repeating-linear-gradient(0deg, #2a1a08 0 4px, #1a1004 4px 8px);
-    z-index: 100; padding: 4vh 4vw;
+    z-index: 100;
+    padding: calc(4vh + env(safe-area-inset-top)) 4vw calc(4vh + env(safe-area-inset-bottom)) 4vw;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   #menu h1 {
     font-size: clamp(18px, 3vw, 36px);
@@ -196,10 +199,14 @@
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     pointer-events: none;
-    background: linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 90%);
+    /* Subtle vignette only — keep the canvas storm visible across the whole viewport */
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.45) 100%);
   }
   #title-screen.hidden { display: none; }
-  #title-screen .title-stack { pointer-events: auto; text-align: center; padding: 4vh 4vw; }
+  #title-screen .title-stack {
+    pointer-events: auto; text-align: center;
+    padding: calc(4vh + env(safe-area-inset-top)) 4vw calc(4vh + env(safe-area-inset-bottom)) 4vw;
+  }
   #title-screen h1 {
     font-size: clamp(28px, 6vw, 64px);
     color: #f8e8a8;
@@ -487,8 +494,14 @@
     .lobby-player-name { font-size: 11px; }
     .lobby-player-tag { font-size: 8px; }
     /* Menu (character pick / AI pick) — wider grid, larger cards on touch */
-    #menu { padding: 2vh 4vw; align-items: flex-start; overflow-y: auto; }
-    #menu h1 { margin-top: 1em; }
+    #menu {
+      padding: calc(2vh + env(safe-area-inset-top)) 4vw calc(2vh + env(safe-area-inset-bottom)) 4vw;
+      align-items: flex-start;
+      justify-content: flex-start;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #menu h1 { margin-top: 0.5em; }
     .ai-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .ai-card { padding: 6px; }
     .ai-card canvas { width: 64px; height: 64px; }
@@ -505,6 +518,357 @@
   @media (max-width: 800px) {
     #status-banner { font-size: 10px; }
   }
+
+  /*=============================================================
+    MOBILE LANDSCAPE LAYOUT (phones held sideways)
+    Targets short-and-wide viewports — typically a phone in landscape.
+    Match scene already works; this pass tightens gauntlet overlays
+    so they fit without scrolling and use bigger tap targets.
+  =============================================================*/
+  @media (orientation: landscape) and (max-height: 500px) {
+    /* Title screen — compress vertical spacing so all 3 buttons fit */
+    #title-screen .title-stack {
+      padding: 2vh 4vw 2vh 4vw;
+    }
+    #title-screen h1 {
+      font-size: clamp(28px, 7vh, 48px);
+      margin-bottom: 0.1em;
+    }
+    #title-screen h2 {
+      font-size: clamp(9px, 2vh, 14px);
+      margin-bottom: 0.6em;
+    }
+    #title-screen .btn-new {
+      padding: 0.6em 1.4em;
+      font-size: clamp(11px, 2.4vh, 16px);
+      min-height: 36px;
+    }
+    .title-online-row { flex-direction: row !important; gap: 8px; }
+    .title-online-row .btn { padding: 0.5em 1em; min-height: 32px; font-size: 10px; }
+    .title-gauntlet-wrap { gap: 0.2em; margin-top: 0.3em; }
+    .title-gauntlet-sub { font-size: clamp(7px, 1.4vh, 9px); }
+    #btn-fullscreen { padding: 0.4em 0.7em !important; font-size: 9px !important; min-height: 28px; }
+    #title-screen .credits { display: none; } /* save vertical space */
+
+    /* Setup menu — fits more cards per row, smaller padding */
+    #menu {
+      padding: calc(1.5vh + env(safe-area-inset-top)) 3vw calc(1.5vh + env(safe-area-inset-bottom)) 3vw;
+      align-items: stretch;
+      justify-content: flex-start;
+    }
+    #menu h1 {
+      font-size: clamp(14px, 3.5vh, 22px);
+      margin: 0.3em 0 0.4em 0;
+    }
+    .menu-section { margin: 0.4em 0; }
+    .menu-label { font-size: 9px; margin-bottom: 0.4em; }
+    .ai-grid {
+      grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)) !important;
+      gap: 6px;
+    }
+    .ai-card { padding: 4px; min-height: auto; }
+    .ai-card canvas { width: 48px !important; height: 48px !important; }
+    .ai-name { font-size: 8px; }
+    .ai-trait, .ai-tag { font-size: 7px; }
+    .player-input {
+      padding: 0.5em 0.8em;
+      font-size: 11px;
+      min-height: 36px;
+      width: 220px;
+    }
+
+    /* Gauntlet overlays — scrollable + tighter padding */
+    .gnt-overlay {
+      padding: 2vh 3vw;
+      align-items: flex-start;
+      overflow-y: auto;
+    }
+    .gnt-stack { gap: 0.5em; }
+    .gnt-stack canvas { background: #0a0604; }
+
+    /* Soul backstory */
+    #gnt-backstory canvas { width: 80px !important; height: 80px !important; }
+    #gnt-backstory .gnt-back-name { font-size: clamp(14px, 3vh, 20px); }
+    #gnt-backstory .gnt-back-line { font-size: clamp(9px, 1.7vh, 12px); max-width: 80vw; }
+    .gnt-back-hint { font-size: 7px; margin-top: 0.4em; }
+
+    /* Cutscene — portraits side by side, dialogue at bottom */
+    #gnt-cutscene .gnt-cut-row { margin-top: 1vh; gap: 1.5em; }
+    .gnt-cut-portrait canvas { width: 192px !important; height: 192px !important; }
+    .gnt-cut-pname { font-size: 9px; }
+    .gnt-cut-vs { font-size: clamp(18px, 4.5vh, 32px); letter-spacing: 4px; }
+    .gnt-dialogue {
+      padding: 0.6em 0.9em; min-height: 64px;
+      bottom: 1vh; left: 2vw; right: 2vw;
+    }
+    .gnt-dialogue-speaker { font-size: 9px; }
+    .gnt-dialogue-text { font-size: clamp(10px, 1.9vh, 13px); line-height: 1.4; }
+
+    /* Progression screen */
+    .gnt-prog-header { font-size: clamp(16px, 3.5vh, 26px); }
+    .gnt-prog-tagline { font-size: clamp(8px, 1.4vh, 10px); }
+    .gnt-prog-sub { font-size: 10px; }
+    .gnt-prog-character canvas { width: 56px !important; height: 56px !important; }
+    .gnt-prog-cname { font-size: 10px; }
+    .gnt-prog-nodes { gap: 8px; margin: 0.3em 0; }
+    .gnt-node { width: 64px; padding: 4px; gap: 2px; }
+    .gnt-node-num { font-size: 7px; }
+    .gnt-node-icon { width: 38px; height: 38px; }
+    .gnt-node-icon canvas { width: 38px !important; height: 38px !important; }
+    .gnt-node-label { font-size: 6px; line-height: 1.1; }
+
+    /* Opponent intro */
+    .gnt-opp-round { font-size: clamp(12px, 2.6vh, 18px); }
+    .gnt-opp-grid { gap: 6px; }
+    .gnt-opp-card { padding: 4px; min-width: 80px; }
+    .gnt-opp-card canvas { width: 56px !important; height: 56px !important; }
+    .gnt-opp-name { font-size: 8px; }
+    .gnt-opp-trait { font-size: 7px; }
+
+    /* Victory & game-over screens */
+    .gnt-vic-title { font-size: clamp(20px, 4vh, 32px); margin: 0.2em 0; }
+    .gnt-vic-text { font-size: clamp(9px, 1.7vh, 12px); line-height: 1.5; max-width: 82vw; }
+    #gnt-vic-portrait { width: 80px !important; height: 80px !important; }
+    .gnt-go-title { font-size: clamp(18px, 4vh, 30px); margin: 0.2em 0; }
+    .gnt-go-text { font-size: clamp(9px, 1.7vh, 12px); line-height: 1.5; max-width: 82vw; }
+    #gnt-go-portrait { width: 80px !important; height: 80px !important; }
+    .gnt-vic-actions { gap: 0.5em; margin-top: 0.6em; }
+    .gnt-vic-actions .btn { padding: 0.6em 1em; min-height: 36px; font-size: 10px; }
+
+    /* Setup screen action buttons (start / back) */
+    #menu-actions { padding-top: 0.5em; }
+
+    /* Online lobby — compress for landscape */
+    #online-lobby, #online-join {
+      padding: 1.5vh 3vw;
+      align-items: flex-start;
+    }
+    .lobby-stack { padding-top: 1vh; gap: 0.6em; }
+    .lobby-code { font-size: clamp(20px, 5vh, 32px); }
+  }
+
+  /* Even shorter screens (typical phone landscape ~375x180 effective viewport) */
+  @media (orientation: landscape) and (max-height: 380px) {
+    #title-screen h1 { font-size: clamp(22px, 6vh, 36px); }
+    #title-screen h2 { font-size: clamp(8px, 1.6vh, 11px); margin-bottom: 0.4em; }
+    .ai-card canvas { width: 40px !important; height: 40px !important; }
+    .gnt-cut-portrait canvas { width: 144px !important; height: 144px !important; }
+    .gnt-node { width: 52px; }
+    .gnt-node-icon { width: 30px; height: 30px; }
+    .gnt-node-icon canvas { width: 30px !important; height: 30px !important; }
+  }
+
+  /* ========= TITLE GAUNTLET CTA ========= */
+  .title-gauntlet-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 0.4em;
+    margin-top: 0.6em;
+  }
+  #btn-gauntlet {
+    background: #4a1010;
+    border-color: #f48030;
+    box-shadow: 0 0 0 4px #2a0808, 0 0 30px rgba(255,80,40,0.55);
+    font-size: clamp(13px, 1.7vw, 20px);
+    letter-spacing: 3px;
+  }
+  #btn-gauntlet:hover { background: #6a1818; }
+  .title-gauntlet-sub {
+    font-size: clamp(8px, 1.1vw, 11px);
+    color: #c89860;
+    font-style: italic;
+    letter-spacing: 2px;
+    text-shadow: 1px 1px 0 #1a0a04;
+  }
+  /* ========= GAUNTLET CAMPAIGN ========= */
+  .gnt-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      linear-gradient(to bottom, rgba(0,0,0,0.92), rgba(0,0,0,0.96)),
+      repeating-linear-gradient(0deg, #2a1a08 0 4px, #1a1004 4px 8px);
+    padding: 4vh 4vw;
+    overflow-y: auto;
+    opacity: 1;
+    transition: opacity 0.4s ease-in-out;
+  }
+  .gnt-overlay.gnt-fade-in  { opacity: 0; animation: gntFadeIn 0.5s ease forwards; }
+  .gnt-overlay.gnt-fade-out { opacity: 1; animation: gntFadeOut 0.4s ease forwards; }
+  @keyframes gntFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes gntFadeOut { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes gntFlash {
+    0%   { opacity: 1; }
+    20%  { opacity: 0.85; }
+    100% { opacity: 0; }
+  }
+  .gnt-overlay.hidden { display: none; }
+  .gnt-stack {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 1.2em; text-align: center; max-width: 900px; width: 100%;
+  }
+  .gnt-stack canvas { image-rendering: pixelated; background: #0a0604; border: 3px solid #6a4020; }
+
+  /* Soul backstory card */
+  #gnt-backstory .gnt-back-name {
+    font-size: clamp(20px, 3vw, 32px); color: #f4d27a;
+    text-shadow: 3px 3px 0 #6a2010; letter-spacing: 3px;
+  }
+  #gnt-backstory .gnt-back-line {
+    font-size: clamp(11px, 1.6vw, 16px); color: #d8a868;
+    font-style: italic; letter-spacing: 1px; max-width: 600px;
+    line-height: 1.6;
+  }
+  #gnt-backstory canvas { width: 128px; height: 128px; }
+  .gnt-back-hint { font-size: 8px; color: #8a6840; letter-spacing: 2px; margin-top: 1em; opacity: 0.6; }
+
+  /* Atmospheric bg canvas (covers full overlay, behind content) */
+  .gnt-bg-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    image-rendering: pixelated;
+    z-index: 0;
+    background: #1a1004;
+  }
+  .gnt-overlay > *:not(.gnt-bg-canvas):not(.gnt-dialogue) { position: relative; z-index: 1; }
+  .gnt-dialogue { z-index: 2; }
+
+  /* Cutscene */
+  #gnt-cutscene { padding: 0; background: none; }
+  #gnt-cutscene .gnt-bg-canvas { background: #0a0602; }
+  #gnt-cutscene .gnt-cut-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 3em; margin-top: 4vh; flex-wrap: wrap;
+  }
+  .gnt-cut-portrait {
+    display: flex; flex-direction: column; align-items: center; gap: 0.6em;
+  }
+  .gnt-cut-portrait canvas { width: 320px; height: 320px; image-rendering: pixelated; }
+  .gnt-cut-pname { font-size: 13px; color: #f4d27a; letter-spacing: 3px; text-shadow: 2px 2px 0 #1a0604; }
+  .gnt-cut-vs {
+    font-size: clamp(28px, 4.5vw, 52px); color: #c83020;
+    text-shadow: 3px 3px 0 #2a0808, 0 0 25px rgba(200,40,20,0.5);
+    letter-spacing: 6px;
+  }
+  .gnt-dialogue {
+    position: fixed; left: 5vw; right: 5vw; bottom: 5vh;
+    background: rgba(10,6,4,0.95); border: 4px solid #6a4020;
+    box-shadow: 0 0 0 2px #2a0808, inset 0 0 0 2px #1a1004;
+    padding: 1em 1.4em; min-height: 90px;
+    display: flex; flex-direction: column; gap: 0.5em;
+  }
+  .gnt-dialogue-speaker {
+    font-size: 11px; color: #f48030; letter-spacing: 2px;
+  }
+  .gnt-dialogue-text {
+    font-size: clamp(12px, 1.5vw, 16px); color: #f4e8c8;
+    letter-spacing: 1px; line-height: 1.6; min-height: 1.6em;
+  }
+  .gnt-dialogue-hint {
+    font-size: 8px; color: #8a6840; text-align: right; letter-spacing: 2px;
+    opacity: 0.6;
+  }
+
+  /* Progression screen */
+  .gnt-prog-header {
+    font-size: clamp(20px, 3vw, 36px); color: #f4d27a;
+    text-shadow: 4px 4px 0 #6a2010, 0 0 20px rgba(255,140,40,0.4);
+    letter-spacing: 4px;
+  }
+  .gnt-prog-tagline {
+    font-size: clamp(9px, 1.3vw, 13px);
+    color: #c89860; font-style: italic;
+    letter-spacing: 2px;
+    margin-top: -0.3em;
+  }
+  .gnt-prog-sub { font-size: 12px; color: #c89860; letter-spacing: 3px; }
+  .gnt-prog-character {
+    display: flex; align-items: center; gap: 1em;
+  }
+  .gnt-prog-character canvas { width: 96px; height: 96px; }
+  .gnt-prog-cname { font-size: 12px; color: #f4d27a; letter-spacing: 2px; }
+  .gnt-prog-nodes {
+    display: flex; gap: 14px; align-items: center; justify-content: center;
+    margin: 1em 0; flex-wrap: wrap;
+    position: relative;
+  }
+  .gnt-node {
+    width: 96px; padding: 8px;
+    border: 3px solid #4a3010; background: #1a1004;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    transition: all 0.2s;
+  }
+  .gnt-node-num { font-size: 9px; color: #8a6840; letter-spacing: 2px; }
+  .gnt-node-icon {
+    width: 56px; height: 56px; background: #0a0604;
+    display: flex; align-items: center; justify-content: center;
+    color: #4a3010; font-size: 28px;
+  }
+  .gnt-node-label { font-size: 7px; color: #8a6840; letter-spacing: 1px; text-align: center; }
+  .gnt-node.upcoming { opacity: 0.4; }
+  .gnt-node.completed { border-color: #f4d27a; background: #2a1a08; }
+  .gnt-node.completed .gnt-node-icon { color: #f4d27a; }
+  .gnt-node.completed .gnt-node-num { color: #f4d27a; }
+  .gnt-node.completed .gnt-node-label { color: #c89860; }
+  .gnt-node.current {
+    border-color: #f48030; background: #2a1a08;
+    box-shadow: 0 0 0 2px #6a2010, 0 0 25px rgba(255,140,40,0.6);
+    animation: gntPulse 1.4s ease-in-out infinite;
+  }
+  .gnt-node.current .gnt-node-icon { color: #f48030; }
+  .gnt-node.current .gnt-node-num { color: #f48030; }
+  .gnt-node.boss {
+    border-color: #c83020 !important; background: #1a0a04 !important;
+  }
+  .gnt-node.boss.current {
+    box-shadow: 0 0 0 2px #c83020, 0 0 35px rgba(200,40,20,0.7);
+  }
+  @keyframes gntPulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.06); }
+  }
+
+  /* Opponent intro */
+  .gnt-opp-round {
+    font-size: clamp(16px, 2.4vw, 26px); color: #f48030;
+    text-shadow: 3px 3px 0 #2a0808; letter-spacing: 3px;
+  }
+  .gnt-opp-grid {
+    display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+  }
+  .gnt-opp-card {
+    background: #1a1004; border: 3px solid #4a3010;
+    padding: 8px; display: flex; flex-direction: column; align-items: center;
+    gap: 4px; min-width: 110px;
+  }
+  .gnt-opp-card canvas { width: 80px; height: 80px; }
+  .gnt-opp-name { font-size: 9px; color: #f4d27a; letter-spacing: 2px; text-align: center; }
+  .gnt-opp-trait { font-size: 7px; color: #8a6840; letter-spacing: 1px; }
+
+  /* Victory screen */
+  #gnt-victory { background: linear-gradient(to bottom, #4080c0 0%, #80c0e0 60%, #f8d878 100%); }
+  .gnt-vic-title {
+    font-size: clamp(28px, 4vw, 48px); color: #fff8c0;
+    text-shadow: 4px 4px 0 #c08030, 0 0 20px rgba(255,220,120,0.7);
+    letter-spacing: 4px; margin: 0.5em 0;
+  }
+  .gnt-vic-text {
+    font-size: clamp(11px, 1.5vw, 14px); color: #2a1a08;
+    line-height: 1.7; max-width: 600px; letter-spacing: 1px;
+  }
+  #gnt-vic-portrait { width: 128px; height: 128px; }
+  .gnt-vic-actions { display: flex; gap: 1em; margin-top: 1.5em; flex-wrap: wrap; justify-content: center; }
+
+  /* Game-over screen */
+  #gnt-gameover {
+    background: radial-gradient(ellipse at center, rgba(20,80,40,0.4) 0%, rgba(0,0,0,1) 80%);
+  }
+  .gnt-go-title {
+    font-size: clamp(26px, 4vw, 44px); color: #80f080;
+    text-shadow: 4px 4px 0 #103020, 0 0 30px rgba(80,255,120,0.6);
+    letter-spacing: 4px; margin: 0.5em 0;
+  }
+  .gnt-go-text {
+    font-size: clamp(11px, 1.5vw, 14px); color: #c89860;
+    font-style: italic; max-width: 600px; line-height: 1.7;
+  }
+  #gnt-go-portrait { width: 128px; height: 128px; filter: hue-rotate(90deg) brightness(0.5); }
 
   #gameover-overlay {
     position: fixed; inset: 0;
@@ -565,6 +929,43 @@
     margin-top: 3px;
   }
   body:not(.in-game) .mob-round-info { display: none; }
+
+  /* Canvas slot — wraps the canvas inside the mobile-view layout.
+     The canvas is teleported here via JS when entering portrait mode,
+     and back to #app when leaving.
+     Sized at 55vh and uses object-fit: cover to ZOOM into the center of
+     the scene — far-edge crew silhouettes crop off, table + characters
+     stay dominant. This is the simplest way to fit a 16:9 source canvas
+     into a portrait viewport without distortion. */
+  .mob-canvas-slot {
+    width: 100vw;
+    /* Slot matches canvas's 9:16 portrait aspect so canvas fills with no letterbox.
+       Capped at 78vh so the bid controls + hand stay above the fold on tall phones. */
+    aspect-ratio: 9 / 16;
+    max-height: 78vh;
+    background: #000;
+    border-bottom: 3px solid #6a4020;
+    box-shadow: inset 0 -2px 8px rgba(0,0,0,0.8);
+    overflow: hidden;
+    position: relative;
+    display: none;
+  }
+  body.in-game .mob-canvas-slot { display: block; }
+  /* Canvas is 270x480 (portrait, 9:16). With matching slot aspect, contain
+     fills exactly with negligible letterbox (only when max-height kicks in). */
+  .mob-canvas-slot canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+    object-position: center;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  /* Hide the redundant mobile player list and bid display — canvas now
+     shows who's playing, whose turn, and the central bid badge. */
+  body.in-game .mob-players { display: none; }
+  body.in-game .mob-bid-display { display: none; }
   .mob-icon-btn {
     font-family: 'Press Start 2P', monospace;
     background: #1a1004; color: #f4d27a;
@@ -579,6 +980,8 @@
     background: #2a1808;
     border-color: #6a4020;
   }
+  /* Two-button cluster (fullscreen + audio) on the right of mobile header */
+  .mob-header-right { display: flex; gap: 6px; }
   .mob-title-block {
     flex: 1; text-align: center;
     display: flex; flex-direction: column; gap: 2px;
@@ -844,6 +1247,49 @@
     /* Hide the desktop canvas + HUD entirely on portrait phones */
     #app { display: none !important; }
     #hud { display: none !important; }
+    /* But ON THE TITLE SCREEN, show the canvas as a fullscreen storm/ship backdrop.
+       The title-screen overlay is transparent at the top so the storm scene shows through. */
+    body.on-title #app {
+      display: block !important;
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 0;
+      background: #000;
+    }
+    body.on-title #app canvas {
+      width: 100vw !important;
+      height: 100vh !important;
+      max-height: none !important;
+      max-width: none !important;
+      object-fit: cover !important;
+      object-position: center center;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    body.on-title #title-screen {
+      z-index: 90;
+      /* Push the title stack to the lower third so the Dutchman + storm
+         dominate the upper viewport (per design: the ocean/sea fills the screen) */
+      justify-content: flex-end !important;
+      padding-bottom: calc(8vh + env(safe-area-inset-bottom));
+    }
+    body.on-title #title-screen .title-stack {
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+    /* Slightly heavier bottom vignette on mobile so buttons stay legible
+       against the crashing waves, but keep the upper viewport open. */
+    body.on-title #title-screen {
+      background: linear-gradient(
+        to bottom,
+        rgba(0,0,0,0) 0%,
+        rgba(0,0,0,0) 50%,
+        rgba(0,0,0,0.55) 80%,
+        rgba(0,0,0,0.85) 100%
+      ) !important;
+    }
     /* Show the mobile UI when in-game on portrait */
     body.in-game #mobile-view { display: flex; flex-direction: column; min-height: 100vh; background: #0a0604; }
     /* Lobby + title + menu still work — they're already mostly HTML — but tighten them. */
@@ -852,7 +1298,13 @@
     .title-online-row { flex-direction: column; gap: 8px; align-items: stretch; }
     .title-online-row .btn { padding: 1em 1.4em; min-height: 52px; }
     #title-screen .btn-new { padding: 1.2em 2em; min-height: 60px; font-size: clamp(16px, 4.5vw, 22px); }
-    #online-lobby, #online-join { padding: 4vh 4vw; align-items: stretch; }
+    #online-lobby, #online-join {
+      padding: calc(4vh + env(safe-area-inset-top)) 4vw calc(4vh + env(safe-area-inset-bottom)) 4vw;
+      align-items: stretch;
+      justify-content: flex-start;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
     .lobby-stack { width: 100%; gap: 1.2em; }
     .lobby-actions { flex-direction: column; }
     .lobby-actions .btn { width: 100%; min-height: 52px; }
@@ -906,6 +1358,11 @@
     <h1>LIAR'S DICE</h1>
     <h2>~ Dead Man's Chest ~</h2>
     <button class="btn-new" id="btn-new-game">NEW GAME</button>
+    <div class="title-gauntlet-wrap">
+      <button class="btn-new" id="btn-gauntlet">⚔ DAVY JONES'S GAUNTLET</button>
+      <div class="title-gauntlet-sub">win back yer soul</div>
+    </div>
+    <button class="btn ghost small" id="btn-fullscreen" title="Toggle fullscreen" style="margin-top:0.6em; padding:0.5em 0.9em; font-size:10px;">⛶ FULLSCREEN</button>
     <div class="title-online-row">
       <button class="btn ghost small" id="btn-host-online">HOST ONLINE</button>
       <button class="btn ghost small" id="btn-join-online">JOIN GAME</button>
@@ -975,8 +1432,14 @@
       <div class="mob-code" id="mob-code"></div>
       <div class="mob-round-info" id="mob-round-info"></div>
     </div>
-    <button class="mob-icon-btn" id="mob-audio-btn" title="Toggle music">♪</button>
+    <div class="mob-header-right">
+      <button class="mob-icon-btn" id="mob-fs-btn" title="Toggle fullscreen">⛶</button>
+      <button class="mob-icon-btn" id="mob-audio-btn" title="Toggle music">♪</button>
+    </div>
   </div>
+  <!-- Canvas is moved here on mobile portrait so the visual game scene
+       (table + characters + atmosphere) stays in view above the controls. -->
+  <div id="mob-canvas-slot" class="mob-canvas-slot"></div>
   <div class="mob-status" id="mob-status">Awaiting bid...</div>
   <div class="mob-bid-display" id="mob-bid-display">
     <span class="mob-bid-empty">— No bid yet —</span>
@@ -1011,7 +1474,7 @@
 </div>
 <div id="menu" class="hidden">
   <h1 style="font-size: clamp(16px, 2.6vw, 28px); margin-bottom: 0.6em;">SET YE CREW</h1>
-  <div class="menu-section">
+  <div class="menu-section" id="game-mode-section">
     <div class="menu-label">GAME MODE</div>
     <div class="mode-toggle">
       <button class="mode-btn active" data-mode="solo">SOLO (vs AI)</button>
@@ -1054,6 +1517,92 @@
     <div class="go-actions">
       <button class="btn small" id="btn-play-again">PLAY AGAIN</button>
       <button class="btn ghost small" id="btn-back-title">⟵ TITLE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================
+  GAUNTLET CAMPAIGN OVERLAYS
+  ======================================================== -->
+<!-- Soul-backstory flash card -->
+<div id="gnt-backstory" class="gnt-overlay hidden">
+  <div class="gnt-stack">
+    <canvas id="gnt-back-portrait" width="64" height="64"></canvas>
+    <div class="gnt-back-name" id="gnt-back-name">CAPTAIN</div>
+    <div class="gnt-back-line" id="gnt-back-line">...</div>
+    <div class="gnt-back-hint">tap to continue</div>
+  </div>
+</div>
+
+<!-- Cutscene (Davy + player + dialogue typewriter) -->
+<div id="gnt-cutscene" class="gnt-overlay hidden">
+  <canvas class="gnt-bg-canvas" id="gnt-cutscene-bg" width="1280" height="720"></canvas>
+  <div class="gnt-cut-row">
+    <div class="gnt-cut-portrait" id="gnt-cut-davy-wrap">
+      <canvas id="gnt-cut-davy" width="64" height="64"></canvas>
+      <div class="gnt-cut-pname">DAVY JONES</div>
+    </div>
+    <div class="gnt-cut-vs">VS</div>
+    <div class="gnt-cut-portrait" id="gnt-cut-player-wrap">
+      <canvas id="gnt-cut-player" width="64" height="64"></canvas>
+      <div class="gnt-cut-pname" id="gnt-cut-pname">CAPTAIN</div>
+    </div>
+  </div>
+  <div class="gnt-dialogue">
+    <div class="gnt-dialogue-speaker" id="gnt-dialogue-speaker">DAVY JONES</div>
+    <div class="gnt-dialogue-text" id="gnt-dialogue-text">...</div>
+    <div class="gnt-dialogue-hint" id="gnt-dialogue-hint">▼ tap to continue</div>
+  </div>
+</div>
+
+<!-- Progression screen — 5 nodes, ship-rope path -->
+<div id="gnt-progression" class="gnt-overlay hidden">
+  <canvas class="gnt-bg-canvas" id="gnt-prog-bg" width="1280" height="720"></canvas>
+  <div class="gnt-stack">
+    <div class="gnt-prog-header">DAVY JONES'S GAUNTLET</div>
+    <div class="gnt-prog-tagline">~ win back yer soul ~</div>
+    <div class="gnt-prog-sub" id="gnt-prog-sub">ROUND 1 OF 5</div>
+    <div class="gnt-prog-character">
+      <canvas id="gnt-prog-char-portrait" width="48" height="48"></canvas>
+      <div class="gnt-prog-cname" id="gnt-prog-cname">CAPTAIN</div>
+    </div>
+    <div class="gnt-prog-nodes" id="gnt-prog-nodes"></div>
+    <button class="btn" id="gnt-prog-begin">BEGIN ROUND 1</button>
+  </div>
+</div>
+
+<!-- Opponent intro card -->
+<div id="gnt-opponents" class="gnt-overlay hidden">
+  <div class="gnt-stack">
+    <div class="gnt-opp-round" id="gnt-opp-round">ROUND 1: BILGE RATS</div>
+    <div class="gnt-opp-grid" id="gnt-opp-grid"></div>
+    <button class="btn" id="gnt-opp-begin">SET SAIL</button>
+  </div>
+</div>
+
+<!-- Victory screen — soul reclaimed -->
+<div id="gnt-victory" class="gnt-overlay hidden">
+  <canvas class="gnt-bg-canvas" id="gnt-vic-bg" width="1280" height="720"></canvas>
+  <div class="gnt-stack">
+    <canvas id="gnt-vic-portrait" width="64" height="64"></canvas>
+    <div class="gnt-vic-title">SOUL RECLAIMED</div>
+    <div class="gnt-vic-text" id="gnt-vic-text">...</div>
+    <div class="gnt-vic-actions">
+      <button class="btn small" id="gnt-vic-again">NEW GAUNTLET</button>
+      <button class="btn ghost small" id="gnt-vic-menu">MAIN MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game-over screen — soul taken -->
+<div id="gnt-gameover" class="gnt-overlay hidden">
+  <div class="gnt-stack">
+    <canvas id="gnt-go-portrait" width="64" height="64"></canvas>
+    <div class="gnt-go-title">YER SOUL BE MINE</div>
+    <div class="gnt-go-text" id="gnt-go-text">The locker claims another...</div>
+    <div class="gnt-vic-actions">
+      <button class="btn small" id="gnt-go-again">TRY AGAIN</button>
+      <button class="btn ghost small" id="gnt-go-menu">MAIN MENU</button>
     </div>
   </div>
 </div>
@@ -1116,6 +1665,15 @@ const PAL = {
   'c': '#d09010',
   'M': '#cc2a36',
   '$': '#a01828',
+  // 3-tone shading helpers added for the v3 redesigned bust portraits.
+  'D': '#7a5030',  // coat brown highlight
+  'E': '#4a70a0',  // navy coat mid-highlight
+  'I': '#5a8870',  // green-skin mid (Davy/sea-creature)
+  'U': '#306858',  // green-skin shadow
+  'J': '#d4a574',  // warm skin highlight (humans)
+  'v': '#807060',  // mid taupe (weathered cloth)
+  '/': '#3a3024',  // deep cloth shadow
+  '%': '#9a7848',  // warm hat band
 };
 
 function drawSprite(ctx, sprite, x, y, scale=1) {
@@ -1164,36 +1722,103 @@ function drawSpriteAt(ctx, sprite, x, y, displayPx) {
 const PIRATES = [
   { id: 'davy', name: 'DAVY JONES', trait: 'Calculating', aggro: 0.45, callTreshold: 0.42,
     sprite: `
+      ................................................................
+      .........................nnnnnnnnnnnnnn.........................
+      .......................nNNNNNNNNNNNNNNNNn.......................
+      .....................nNNNNNNNNNNNNNNNNNNNNn.....................
+      .....................nNNN5NNNNNNNNNNNN5NNNn.....................
+      ..................nNNNNNNNNNNNNNNNNNNNNNNNNNNn..................
+      ................nNNN5NNNNN5NN5NNNN5NN5NNNNN5NNNn................
+      ...............nNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNn...............
+      .............nNNNNN0xxxxxxxxxxxxxxxxxxxxxxxx0NNNNn..............
+      ..........nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn..........
+      ..............UIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIU..............
+      .................UIIUUUUUUUUUUIIIUUUUUUUUUUIIU..................
+      .............UIIIIkkkqqkkkkIIIIIIIIkkkkqqkkkIIIIIU..............
+      ............UIIIIIkkkkkkkkkIIIIIIIIIkkkkkkkkkIIIIIU.............
+      ............UIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIU.............
+      ............UIIIIIIIIIIIIIIIUUUUUUIIIIIIIIIIIIIIIIU.............
+      ............UULLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLUU............
+      ............LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL............
+      .......b5D5DLLLLmLLLLmLLLLmLLLLLLLLLLmLLLLmLLLLmLLLLD5D5b.......
+      ......b5DDD5LLLLmLLLLmLLLLmLLLLmLLLLmLLLLmLLLLmLLLLm5DDD5b......
+      ......b55DDDLLLLmLLLLmLLLLmLLLLmLLLLmLLLLmLLLLmLLLLmDDD55b......
+      ......bD555DLkLLm5LLLmLkLLmLLkLmLkLLm5LkLmLkLLm5LkLmD555Db......
+      ......bD555D.LL.m5LLLm5LLLmLLLLmLLLLm5LLLm5LLLm.LL.mD555Db......
+      ......bD555D..L.m5LLLm5LkLmLkLLmLLkLm5LkLm5LkLm.L..mD555Db......
+      ......b5DDD5....mm5LLm5LLLmLLLLmLLLLm5LLLm5LLLm....m5DDD5b......
+      ......buuD5b....mm5Lkm5LkLmLkLLmLLkLm5LkLm5LkLm....m5DDD5b......
+      ......b5uu55....m.LL.m5LLLmLLLLmLLLLm5LLLm.LL.m....m5DDD5b......
+      ......bD5uuD....m....m5LkLmLkLLmLLkLm5LkLm....m....mD55uub......
+      ......b55D5D....m....m5LLLmLLLLmLLLLm5LLLm....m....mMMOM5b......
+      ......b5D5D5....m....m.LL.mLLLLmLLLLm.LL.m....m....mOOMM5b......
+      ......bD5D55....m....m....mLLLLmLLLLm....m....m....mMMOM5b......
+      ......b55D5D....m....m....mLkLLmLLkLm....m....m....m5DDD5b......
+      ......b5D5D5....m....m....mLLLLmLLLLm....m....m....m5D5D5b......
+      ......b5DDD555D5D5DD5D5DD5D5DD5D5DD5D5DD5D5DD5D5D55D5DDD5b......
+      ......b5DDD55D5D5DD5D5DD5D5DD5D5DD5D5DD5D5DD5D5D55D55DDD5b......
+      ......b5DDD5mmmmmmmm00xxxxxxxxxxxxxxxxxxx00mmmmmmmm5DDD5b.......
+      ......b5DDD5mmmmmmmm00XXXXXXXXXXXXXXXXXXX00mmmmmmmm5DDD5b.......
+      .......bbBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBbb.......
+      .......bbnnnnnnnbbnnnnnnnnnnnnnnbbnnnnnnnnnnnnnnnbbnnbnbb.......
+      ........bnnnbbbnnnnnnnnnbbnnnnnnnnnnnnbbnnnnbnnbnnnbbnnb........
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+    `},
+  { id: 'flydutch', name: 'FLYING DUTCHMAN', trait: 'Haunting', aggro: 0.58, callTreshold: 0.40,
+    sprite: `
       ................................
       ................................
-      ................................
-      .......nnnnnnnnnnnnnnnnnn.......
-      ......nnnnnnnnnnnnnnnnnnnn......
-      ......nNNNNNNNNNNNNNNNNNNn......
-      .....nNN0xxxxxxxxxxxxxx0NNn.....
-      .....nNxxxxxxxxxxxxxxxxxxNn.....
-      ......nzzZZZZZZZZZZZZZZzzn......
-      .....zZZZZZZZZZZZZZZZZZZZz......
-      ....zZZkkZZZZZZZZZZeeZZZZZz.....
-      ....zZZkkZZZZZZZZZZeeZZZZZz.....
-      ....zZZZZZZjjjjjjjjZZZZZZZz.....
-      .....zZjjzzzzzzzzzzzzjjZz.......
-      ....zZjjzZZZZZZZZZZZZzzjjZz.....
-      ....zZjzZjjjjjjjjjjjjjzzjZz.....
-      ....zZjzZjjjzzzzzzzzjjjzjZz.....
-      ....zZjzZjzzZZZZZZZzzzjzjZz.....
-      ....zZjjzZzzZjjjjjjzzzZjjZz.....
-      .....zZjjzZzzZjjjjjzzZjjZz......
-      ......zZjjjzZZjjjjjZZjjjZz......
-      .......zzZZjjjjjjjjjjZZzz.......
-      ........zzZZZZjjjjZZZZzz........
-      .........zzzZZZZZZZZzzz.........
-      .........nNNNBBBBBBNNNn.........
-      ........nNN0xxxxxxxx0NNn........
-      ........nN555555555555NN........
-      ........nN000xxxxxx000Nn........
-      ........nbB5555555555Bbn........
-      .........nbnnnnnnnnnnbn.........
+      .............nnnnnn.............
+      ...........nnNNNNNNnn...........
+      .........nnNNNNNNNNNNNNnn.......
+      ........nNNNNNNNNNNNNNNNNn......
+      .......nNNNwwNNwwNNNNNNNNNn.....
+      .......nNNNwwwwwwNwwwNNNNNn.....
+      .......nNNNNwNwNNwNNwNNNNNn.....
+      ......nnnnnnnnnnnnnnnnnnnnnn....
+      ........gGGGGGGGGGGGGGGGgg......
+      .......gGGGGGGGGGGGGGGGGGGg.....
+      ......gGGiiiGGGGGGGGGGiiiGGg....
+      ......gGGiiiGGGGGGGGGGiiiGGg....
+      ......gGGGGGGGGGGGGGGGGGGGg.....
+      .......gGGGwwwwwwwwwwwwGGg......
+      .......gGGwwwwwwwwwwwwwwGg......
+      ......gGGwGwwGGwwwwGGwwGGGg.....
+      ......gGGwwGwwwwwwwwGwwwGGg.....
+      ......gGGGGGGGGGGGGGGGGGGGg.....
+      .......gGGGgggGGGGGGgggGGg......
+      ........gGggggGGGgggggGGg.......
+      .........gGgggggGgggggGgg.......
+      ..........gGgggGGGggggGg........
+      ...........gGGgGGGGgGGg.........
+      ............ggGGGGGGgg..........
+      .............ggGGGGgg...........
+      ..............ggggg.............
+      ...............ggg..............
+      ................g...............
       ................................
       ................................
     `},
@@ -1304,74 +1929,138 @@ const PIRATES = [
     `},
   { id: 'pegleg', name: 'OLD PEGLEG', trait: 'Bluffer', aggro: 0.70, callTreshold: 0.40,
     sprite: `
-      ................................
-      ................................
-      .......nnnnnnnnnnnnnnnn.........
-      ......nNNNNNNNNNNNNNNNNN........
-      ......nN0xxxxxxxxxxxxx0Nn.......
-      .....nNNxxxxxxxxxxxxxxxNNn......
-      .....nNxxxxxxxxxxxxxxxxxNn......
-      ......lllllLLLLLLLLLlllll.......
-      .....llLkkkkkkLLLLLLLLLLLll.....
-      .....lLLkkkkkkLLLLLLeLLLLLl.....
-      .....lLLkkkkkkLLLLLLLLLLLLl.....
-      .....lLLLLLLLLLLnnnnLLLLLLl.....
-      .....lLLLLLwmmmmmmmmwLLLLll.....
-      ......nllwwwwwwwwwwwwwwlln......
-      ......nnllllllllllllllnn........
-      .....rRRRRRRRRRRRRRRRRRRr.......
-      ....rRR0xxxxxxxxxxxxxx0RRr......
-      ....rRRRRRRRRRRRRRRRRRRRRR......
-      ....rRR000000000000000000R......
-      ....rRRRRRRRRRRRRRRRRRRRRR......
-      .....nnnnnnnnnnnnnnnnnn.........
-      ......555555555555555...........
-      ......555555555555555...........
-      ......nnnnnnnnnnnnnn............
-      .......nbnbnbnB...n.............
-      .......nbnnnnnB...n.............
-      ........bbnnnnB....n............
-      .........nnnnnB.................
-      ..........nnnnn.................
-      ................................
-      ................................
-      ................................
+      ................................................................
+      ................................................................
+      ..............................nNNn..............................
+      ............................nNNNNNNn............................
+      ..........................nNNNNNNNNNNn..........................
+      ........................nNNNNNNNNNNNNNNn........................
+      ......................nNNNNNNNNNNNNNNNNNNn......................
+      ....................nNNNNNNNNNNNNNNNNNNNNNNn....................
+      ..................nNNNNNNNNNNNNNNNNNNNNNNNNNNn..................
+      ................nNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNn................
+      ..............nNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNn..............
+      .............nNN0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0NNn.............
+      .............nN0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0Nn.............
+      .............nNxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxNn.............
+      ............nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn............
+      ............lLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLll.............
+      ............lLLLLLLLLLLLLLLLLLrLLLLLLLLLLLLLLLLLLll.............
+      .............lLLkkkkkkLLLLLLLLLLLLLLLLLkkkkkkkLLLll.............
+      .............lLLkkkkkkkLLLLLLLLLLLLLLLkkqqqkkkLLLll.............
+      .............lLLkkkkkkkkkLLLLLLLLLLLLkkkqqqkkkLLLll.............
+      ............lLLkkkkkkkkkkLLLLLLLLLLLLLkkkkkkkLLLLll.............
+      .............lLLLkkkkkkkkLLLLLLLLLLLLLLLLLLLLLLLLll.............
+      .............lLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLll.............
+      ............lLLLLLLLLLLLLLLLLLnnLLLLLLLLLLLLLLLLLll.............
+      ............lLLLLnnLLLLLLLLLLLLLLLLLLLLLLLLLnnLLLLll............
+      .............lLLLLLLLLLLLnnwwwwwwwwwwnnLLLLLLLLLLll.............
+      ............lLLLLLLLLnnwwwwww33wwww33wwwwnnLLLLLLLll............
+      ............llLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLll............
+      ............ssssssssssssssssssssssssssssssssssssssss............
+      ............SsssSssSsssSssSsssSssSsssSssSsssSssSsssS............
+      ..............ssssssssssssssssssssssssssssssssssss..............
+      ..............SsssSsssSsssSsssSsssSsssSsssSsssSss...............
+      ................ssssssssssssssssssssssssssssssss................
+      ................SsssSsssSsssSsssSsssSsssSsssSss.................
+      ...................ssssssssssssssssssssssssss...................
+      ..........................llLLLLLLLLll..........................
+      .........................lLLLLLLLLLLLLl.........................
+      .......................lLLLLLLLLLLLLLLLLl.......................
+      .....................nbBBwwwwwwwwwwwwwwBBbn.....................
+      ....................nbBBBwwwwwwwwwwwwwwBBBbn....................
+      ..................nbBBBB55wwwwwwwwwww55BBBBbn...................
+      .................nbBBBBBB55wwwwwwwww55BBBBBBbn..................
+      ................nbBBBBBBBB5wwwwwwwww5BBBBBBBBbn.................
+      ..................nbBBBB5DDDDDDDDDDDDDD5BBBBbn..................
+      ..................nbBBBB5DD0DDDDDD0DDDD5BBBBbn..................
+      ..................nbBBBB5DDDDDDDDDDDDDD5BBBBbn..................
+      ..................nbBBBB5DD0DDDDDD0DDDD5BBBBbn..................
+      ..................nbBBBB5DDDDDDDDDDDDDD5BBBBbn..................
+      ..................nbBBBB5DD0DDDDDD0DDDD5BBBBbn..................
+      ..................nbBBBB5DDDDDDDDDDDDDD5BBBBbn..................
+      ..................nbBBBB5DD0DDDDDD0DDDD5BBBBbn..................
+      ..................nbBBBB5DDDDDDDDDDDDDD5BBBBbn..................
+      ..................nbBBB5DDDDDDDDDDDDDDDD5BBBbn..................
+      ...................nbB5550xxxxxxxxxxxx0555Bbn...................
+      ...................nbB55XXXXXXXXXXXXXXXX55Bbn...................
+      .................nbBBBBBBBBBBBBBBBBBBBBBBBBBbn..................
+      .................nbnnnnnnnnnnnnnnnnnnnnnnnnnnbn.................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
     `},
 
   { id: 'blackbeard', name: 'BLACKBEARD', trait: 'Ruthless', aggro: 0.85, callTreshold: 0.55,
     sprite: `
-      ................................
-      ................................
-      ................................
-      ........nnnnnnnnnnnnnnnn........
-      .......nnnnnnnnnnnnnnnnnn.......
-      ......nNNNNNNNNNNNNNNNNNNn......
-      .....nNN0xxxxxxxxxxxxxx0NNn.....
-      .....nNxxxxxxxxxxxxxxxxxxNn.....
-      ......nllllllllllllllllllln.....
-      .....llllllllllllllllllllll.....
-      ....llLLLLLLLLLLLLLLLLLLLLLll...
-      ....lLLeeLLLLLLLLLLLLLeeLLll....
-      ....lLLLLLLLLLnnLLLLLLLLLLll....
-      ....lLLLLLLLLwmmwLLLLLLLLLll....
-      ....llkkkkkkkkkkkkkkkkkkkkkk....
-      ...kkkkkkkkkfFkkkkffkkkkkkkkk...
-      ..kkkkkkkkkffFkkfFffkkkkkkkkk...
-      .7.kkkkkkkffFkkkkkkffkkkkkkk.7..
-      .77kkkkkkkkkkkkkkkkkkkkkkk.77...
-      .7..kkkkkkkkkkkkkkkkkkkkkk..7...
-      .7..nnnnnnnnnnnnnnnnnnnnnn..7...
-      .....nB5555555555555555555n.....
-      ....nB000000000000000000000n....
-      ....nB55555555555555555555Bn....
-      ....nB000000000000000000000n....
-      ....nbB5555555555555555555Bn....
-      .....nbnnnnnnnnnnnnnnnnnnbn.....
-      ................................
-      ................................
-      ................................
-      ................................
-      ................................
+      ................................................................
+      ....................nnnnnnnnnnnnnnnnnnnnnnnn....................
+      ..................nNNNNNNNNNNNNNNNNNNNNNNNNNNn..................
+      .................nNNNNNNNNNNNNNNNNNNNNNNNNNNNNn.................
+      ................nNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNn................
+      ..............nNN0xxxxxxxxxxxxxxxxxxxxxxxxxxxx0NNn..............
+      ..............nN0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0Nn..............
+      ..............nNxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxNn..............
+      .........nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.........
+      ...........lLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLll............
+      ............lLLkkkkkkkkkLLLLLLLLLLLLLLkkkkkkkkkLLLll............
+      ...........lLLkeeekkkkkLLLLLLLLLLLLLLkkkkkeeekkkLLLll...........
+      ............lLLkkkkkkkkkLLLLLLLLLLLLLLkkkkkkkkkLLLll............
+      ...........llLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLll...........
+      ...........llLLLLLLLLLLLLLLLLnnLLLLLLLLLLLLLLLLLLLLll...........
+      ..........llLLLLLLLLLLLLLLLLnnnnLLLLLLLLLLLLLLLLLLLLll..........
+      ..........llLLLLLLLLLkkkkkkkkkkkkkkkkkkkkLLLLLLLLLLll...........
+      .....77kkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkk77.....
+      ..77fFFkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkfFF77..
+      ..7fFFFkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkfFFF7..
+      ..7fFFkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkfFF7..
+      ..7fFkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkfF7..
+      ..7fkkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkkf7..
+      ...kkkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkkk...
+      ...kkkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkkk...
+      ...kkkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkkk...
+      ...kkkkkkkRRRRRkkkkkRRRRRkkkkkRRRRRkkkkkRRRRRkkkkkRRRRRkkkkkk...
+      ...kkkkkkrRRRRrkkkkrRRRRrkkkkrRRRRrkkkkrRRRRrkkkkrRRRRrkkkkkk...
+      .........kkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkk.........
+      ..............kkkkkSKKKKSkkkkSKKKKSkkkkSKKKKSkkkkk..............
+      ...................kkkkkSKKKKSkkkkSKKKKSkkkkk...................
+      ........................kkkkkSKKKKSkkkkk........................
+      ..........................llLLLLLLLLll..........................
+      .........................lLLLLLLLLLLLLl.........................
+      .......................lLLLLLLLLLLLLLLLLl.......................
+      ..................nbKKwwwwwwwwwwwwwwwwwwwwKKbn..................
+      .................nbKKKwwwwwwwwwwwwwwwwwwwwKKKbn.................
+      ................nbKKKKwwwwwwwwwwwwwwwwwwwwKKKKbn................
+      ..............nbKKKKKKkkkkkkkkkkkkkkkkkkkkKKKKKKbn..............
+      ............nbKKKKKKKkkkkkkkkkkkkkkkkkkkkkKKKKKKKbn.............
+      .............nbKKKkkkkkrrrrrkkkkkkkkkkkkkkkkkkKKKbn.............
+      .............nbKKKkkkkkkkrrrrrkkkkkkkkkkkkkkkkKKKbn.............
+      .............nbKKKkkkkkkkkkrrrrrkkkkkkkkkkkkkkKKKbn.............
+      .............nbKKKkkkkkkkkkkkrrrrrkkkkkkkkkkkkKKKbn.............
+      .............nbKKKkkkkkkkkkkkk0xxxxx0kkkkkkkkkKKKbn.............
+      .............nbKKKkkkkkkkkkkkkkrrrrrkkkkkkkkkkKKKbn.............
+      .............nbKKKkkkkkkkkkkkkkkkrrrrrkkkkkkkkKKKbn.............
+      .............nbKKKkkkkkkkkkkkkkkkkkrrrrrkkkkkkKKKbn.............
+      .............nbKKKkkkkkkkkkkkkkkkkkkkrrrrrkkkkKKKbn.............
+      .............nbKKKkLLkkkkkkkkkkkkkkkkkkkkkkLLkKKKbn.............
+      .............nbKKKkkk00xxxxxxxxxxxxxxxxxx00kkkKKKbn.............
+      .............nbKKKkkk00XXXXXXXXXXXXXXXXXX00kkkKKKbn.............
+      ........nbBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBbn.........
+      ........nbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnbn.........
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
     `},
   { id: 'jack', name: 'JACK SPARROW', trait: 'Trickster', aggro: 0.60, callTreshold: 0.38,
     sprite: `
@@ -1796,40 +2485,72 @@ const AVATARS = [
       ................................
       ................................
     `},
-  { id: 'invincible', name: 'INVINCIBLE', tag: 'THINK, MARK',
+  { id: 'invincible', name: 'OMNI-MAN', tag: 'NOLAN GRAYSON',
     sprite: `
-      ................................
-      ................................
-      ........nnnnnnnnnnnnnnnn........
-      .......nnNNNNNNNNNNNNNNn........
-      ......nnNNNNNNNNNNNNNNNnnn......
-      .....nnNNNNNNNNNNNNNNNNNNnnn....
-      ......888888888888888888888.....
-      .....88CCCCCCCCCCCCCCCCCC88.....
-      ....8CCCC8888888888888CCCC88....
-      ....8CCC8CCCCCCCCCC8CCCCCC88....
-      ....88888888888888888888888.....
-      ....88888888888888888888888.....
-      ....8888wmmmmmmmwwww888888......
-      .....88wwwwwwwwwwwwww8888.......
-      ......lllllllllllllllll.........
-      .....yyyyyyyyyyyyyyyyyyy........
-      ....y8888888888888888888y.......
-      ....y8yyyy888888888yyyy8y.......
-      ....y8yyyy888888888yyyy8y.......
-      ....yyy88888888888888yyyy.......
-      ....yyy88888888888888yyy........
-      ....yyyyyyyyyyyyyyyyyyy.........
-      ....yyyyyyyyyyyyyyyyyy..........
-      ....nyyyyyyyyyyyyyyyyn..........
-      ................................
-      ................................
-      ................................
-      ................................
-      ................................
-      ................................
-      ................................
-      ................................
+      ................................................................
+      ................................................................
+      .........................NNNNNNNNNNNNNN.........................
+      .......................NNNNNNNNNNNNNNNNNN.......................
+      .....................NNNNNNNNNNNNNNNNNNNNNN.....................
+      ...................NNNNNNNNNNNNNNNNNNNNNNNNNN...................
+      ..................NNNNNNNNNNNNNNNNNNNNNNNNNNNN..................
+      .................NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN.................
+      ................NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN................
+      ...............NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN...............
+      ...............sNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNs...............
+      ...............ssNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNss...............
+      ................sNllllllllllllllllllllllllllllNs................
+      ................NllllllllllllllllllllllllllllllN................
+      ................NllllllllllllllllllllllllllllllN................
+      ..................NlLLkkkkkkkkllllkkkkkkkkLLlN..................
+      ...................NllLLkWWWWkllllkWWWWkLLllN...................
+      ...................NllLLkkkkkkllllkkkkkkLLllN...................
+      ..................NLLllllllllllllllllllllllLLN..................
+      .................NLLllllllllllllllllllllllllLLN.................
+      ..................NLLllllllllllLLllllllllllLLN..................
+      ..................NLLLllllllllLLLLllllllllLLLN..................
+      .................NLLkkkkkkkkkkllllkkkkkkkkkkLLN.................
+      .................NLLkkkkkkkkkkkllkkkkkkkkkkkLLN.................
+      ....................NLLLkkkLllllllllLkkkLLLN....................
+      ....................NLLLLllllkkkkkkllllLLLLN....................
+      ....................NLLLLllllllllllllllLLLLN....................
+      .....................NNLLLllllllllllllLLLNN.....................
+      ......................NNNLLllllllllllLLNNN......................
+      .......................NNLLLLLLLLLLLLLLNN.......................
+      .......................NNLLLLLLLLLLLLLLNN.......................
+      ......................rRRkwwwwwwwwwwwwkRRr......................
+      ...................rRRRRkWwwwwwwwwwwwwWkRRRRr...................
+      .................rRRRRRkWwwwwwwwwwwwwwwWkRRRRRr.................
+      ...............rRRRRRRkWwwwwwwwwwwwwwwwwWkRRRRRRr...............
+      .............rRRRRRRRkwwwwwwwwwwwwwwwwwwwwkRRRRRRRr.............
+      ............rRRRRRRRRkwwwwwwwwwwwwwwwwwwwwkRRRRRRRRr............
+      ............rRRRRRRRRkwwwwwwwwMMMMwwwwwwwwkRRRRRRRRr............
+      ............rRRRRRRRRkwwwwwwwMMMMMMwwwwwwwkRRRRRRRRr............
+      ............rRRRRRRRRkwwwwwwMMMMMMMMwwwwwwkRRRRRRRRr............
+      ............rRRRRRRRRkwwwwwwwMMMMMMwwwwwwwkRRRRRRRRr............
+      ............rRRRRRRRRkwwwwwwwwMMMMwwwwwwwwkRRRRRRRRr............
+      ............rRRRRRRRRkwwwwwwwwwwwwwwwwwwwwkRRRRRRRRr............
+      ............rRRRRRRRkxxxxxxxxxxxxxxxxxxxxxxkRRRRRRRr............
+      ............rRRRRRRRkXXXXXXXXXXXXXXXXXXXXXXkRRRRRRRr............
+      ..........rRRRRRRLLLLkkkkkkkkkkkkkkkkkkkkkkLLLLRRRRRRr..........
+      ..........rRRRRRllllkkkkkkkkkkkkkkkkkkkkkkkkllllRRRRRr..........
+      ...........rRRRRRkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkRRRRRr...........
+      ...........rRRRRkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkRRRRr...........
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
     `},
   { id: 'kratos', name: 'KRATOS', tag: 'GHOST OF SPARTA',
     sprite: `
@@ -2006,7 +2727,155 @@ const AVATARS = [
       ................................
       ................................
     `},
+  { id: 'chud', name: 'CHUD', tag: 'TWO SOULS, ONE BLOB',
+    sprite: `
+      ................................................................
+      ................................................................
+      ....nnnnnnnnnnnnnnnn............................................
+      ...n00xxxxxxxxxxxxxx0n..........................................
+      ..n0xxxCCCCCCCCCCCCxxx0n........................................
+      .n0xxxCCxxxxxxxxxxxxCCxx0n......................................
+      n0xCCxxxxx00xxxxxx00xxxCCx0n....nnnnnnnnnn......................
+      n0xCxxxx00kk00xx00kk00xxxxCx0n.nNNNNNNNNNNn.....................
+      n0xxCxxx0kk00xx00kk0xxxxxxCx0nNNllllllllllNn....................
+      n0xxCxxxxxxxxxxxxxxxx0xxxxCx0NlLLLllllLlLlLN....................
+      n0xxxCxxxxxxxxxx0xxxxxxxxxCx0NlLkkLLLkkLlLN.....................
+      n0xxxxC0xxxxxxxxxxxxxxxxxC0xNlLkkLLLkkLlLLN.....................
+      n0xxxxxx0xxx0000000xxx00x0NLLLLLLLLLLLLLLLN.....................
+      n00xxx0xxx00mmmmmmm00xx00NLlLLLLLnnLLLLLLN......................
+      nn0xx0xxx0mmkkkkkkkmm0xx0NLLLLnnnnnnnLLLLN......................
+      .n00xxxx0mmkkkkkkkkkmm0NLLLLwwwwwwwwwLLLN.......................
+      ..n0xxxx0mmkkkkkkkkkmm0NLLLLLwwwwwwwLLLN........................
+      ..n00xxx0mmmmmmmmmmmmm0NLLLLLLLLLLLLLLN.........................
+      ...n00xxxxx00mmmmmm00xxNLLLLLLLLLLLLN...........................
+      ....nnn00xxxxxxxxxxxxx0NNlLLLLLLLLN.............................
+      ......nnn00xxxxxxxxxx00.nNNNNNNNNn..............................
+      ........nnn0xxxxxxxx0nn..nnnnnnnn...............................
+      .........1xxxxxxxxxx1...........................................
+      ........1xxxxxxxxxxxx1..........................................
+      .......1xxx00xxxx00xxx1.........................................
+      ......1xxxxxxxxxxxxxxxx1........................................
+      ....bBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBb.........................
+      ...bB55D55D55D55D55D55D55D55D55D55D55Bb.........................
+      ..bB5DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD5Bb......................
+      ..bB5DDDDDDrrRRRrDDDDDDDDDDDDDDDDDDDDDD5Bb......................
+      ..bB5DDDDDDrRRRrrDDDDDDDDDDDDDrrRrDDDDD5Bb......................
+      ..bB5DDDDDDDrrrrDDDDDDDDDDDDDrRRrrDDDDD5Bb......................
+      ..bB5DDDDDDDDDDDDDDDDDDDDDDDDDDrrrDDDDDD5Bb.....................
+      ..bB5DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD5Bb.....................
+      ..bB5DDDDDDDDDDDD55555DDDDDDDDDDDDDDDDDDD5Bb....................
+      ..bB5DDDDDDDDDDD5DDDDD5DDDDDDDDDDDDDDDDDD5Bb....................
+      ..bB5DDDDDDDDDD5DDDDDDD5DDDDDDDDDDDDDDDDDD5Bb...................
+      ..bB5DDDDDDDDD5DDDDDDDDD5DDDDDDDDDDDDDDDDD5Bb...................
+      ..bB5DDDDDDDD5DDDDDDDDDDD5DDDDDDDDDDDDDDDDD5Bb..................
+      ..bB55DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD5Bb..................
+      ..bB55DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD5Bb..................
+      ..bbBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBb...................
+      ...bbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnbb...................
+      ....bbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnbbb...................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+      ................................................................
+    `},
 ];
+
+//================================================================
+// GAUNTLET CAMPAIGN — "Reclaim Your Soul"
+//================================================================
+// Per-avatar one-line origin shown after character select.
+const SOUL_BACKSTORIES = {
+  hook:        "Sold his soul to chase the boy who took his hand.",
+  luffy:       "Promised the depths a One Piece he hadn't yet found.",
+  kenway:      "Bet his soul against an Assassin's blade — and lost.",
+  kirby:       "Inhaled the wrong cursed treasure and woke in the locker.",
+  peyton:      "Audibled his soul on the wrong play at the line of scrimmage.",
+  naruto:      "Believed it once too often, and the sea believed him back.",
+  invincible:  "A Viltrumite oath, broken on the deck of the Dutchman.",
+  kratos:      "Old gods owed him debts. The sea collected what was left.",
+  mario:       "Took the wrong pipe — surfaced in Davy Jones's locker.",
+  lebron:      "Took his talents to the wrong harbor.",
+  thragg:      "Even a Viltrumite warlord can be outbid at the dice table.",
+  battlebeast: "Sought a worthier foe in the deep — and found a colder one.",
+  chud:        "Two pirates burnt into one — the locker keeps both of them.",
+};
+// Tiered opponent pools by difficulty. Davy is the locked R5 boss.
+// Each tier needs >= GAUNTLET_OPPONENT_COUNT[round] entries; pickRoundOpponents
+// has a fallback to the global pirate pool if the tier runs short.
+const GAUNTLET_TIERS = {
+  1: ['kidd', 'bootstrap', 'morgan'],                                       // Bilge Rats — lowest aggro/threshold
+  2: ['calico', 'silver', 'koleniko', 'jack'],                               // Deckhands — mid-low
+  3: ['flydutch', 'pegleg', 'anne', 'silver', 'jack'],                       // Officers — mid (silver/jack overlap by design)
+  4: ['maccus', 'blackbeard', 'anne', 'flydutch', 'jack', 'pegleg'],          // First Mates — top tier (overlap = recycle-friendly)
+};
+const GAUNTLET_ROUND_LABELS = {
+  1: 'BILGE RATS', 2: 'DECKHANDS', 3: 'OFFICERS', 4: 'FIRST MATES', 5: 'DAVY JONES',
+};
+const GAUNTLET_OPPONENT_COUNT = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 1 };
+// Difficulty multiplier applied to AI aggro + callTreshold per round.
+const GAUNTLET_DIFFICULTY = { 1: 0.85, 2: 0.95, 3: 1.05, 4: 1.15, 5: 1.30 };
+// Cutscene dialogue. {char} = selected captain's name.
+const GAUNTLET_CUTSCENES = {
+  opening: [
+    { who: 'davy',  text: "So ye want to save the soul of {char}?" },
+    { who: 'davy',  text: "Five perfect rounds against me crew stands between ye and freedom." },
+    { who: 'davy',  text: "Lose but one... and yer soul joins me locker forever." },
+    { who: 'char',  text: "Roll the dice, ye barnacled wretch. I'll take me chances." },
+  ],
+  afterR1: [
+    { who: 'davy',  text: "Hah. Beginner's luck against the bilge rats." },
+    { who: 'davy',  text: "Wait 'til ye taste me proper crew, {char}." },
+  ],
+  afterR2: [
+    { who: 'davy',  text: "Hmph. The deckhands underestimated ye." },
+    { who: 'davy',  text: "Won't make that mistake again." },
+  ],
+  afterR3: [
+    { who: 'davy',  text: "Three rounds. Me officers don't lose to mortals." },
+    { who: 'davy',  text: "Ye've been touched by the sea, haven't ye, {char}?" },
+  ],
+  afterR4: [
+    { who: 'davy',  text: "Enough." },
+    { who: 'davy',  text: "Me First Mates have never been bested. Until now." },
+    { who: 'davy',  text: "Ye stand at me door, {char}. Now we settle this." },
+  ],
+  finalIntro: [
+    { who: 'davy',  text: "Just you. Me. And the dice." },
+    { who: 'davy',  text: "I get a sixth die — the locker's tribute. The storm answers to me." },
+    { who: 'davy',  text: "Yer soul be the wager, {char}. Roll." },
+  ],
+  victory: [
+    { who: 'davy',  text: "...impossible. Five hands. Five wins." },
+    { who: 'davy',  text: "Take it then. Yer cursed soul. Be GONE from me locker!" },
+  ],
+  gameover: [
+    { who: 'davy',  text: "Yer soul be MINE now, {char}." },
+    { who: 'davy',  text: "Welcome to the locker. Forever." },
+  ],
+};
+// Davy mid-match taunts (R5). Fired on triggers, displayed as floating text.
+const GAUNTLET_DAVY_TAUNTS = {
+  onPlayerBluff:  ["A bluff? I smell it on ye.", "Ye lie poorly, {char}.", "The sea knows yer tells."],
+  onPlayerCalled: ["Ye dare call me a liar?", "Bold move. Foolish.", "Hah!"],
+  onPlayerWin:    ["...lucky toss.", "Don't get used to it.", "The next hand will be mine."],
+  onDavyWin:      ["The locker takes another.", "One step closer to me forever.", "Yer soul slips."],
+};
 
 //----------------------------------------------------------------
 // SCENE — Davy Jones cabin: tight oval table, looming crew
@@ -2015,20 +2884,63 @@ const SCENE = (() => {
   const canvas = document.getElementById('scene');
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
-  const W = canvas.width, H = canvas.height; // 480 x 270
+  // Mutable so orientation can flip between landscape and portrait.
+  let W = canvas.width, H = canvas.height; // 480x270 default; 270x480 in portrait
 
   const rain = [];
-  for (let i = 0; i < 60; i++) rain.push({ x: Math.random()*W, y: Math.random()*H, s: 1+Math.random()*1.5 });
+  function rebuildRain() {
+    rain.length = 0;
+    for (let i = 0; i < 60; i++) rain.push({ x: Math.random()*W, y: Math.random()*H, s: 1+Math.random()*1.5 });
+  }
+  rebuildRain();
   let krakenT = 0, lightningT = 0, lightningNext = 4 + Math.random()*8, elapsed = 0;
   function flash() { lightningT = 0.6; return true; }
 
-  // Layout constants for the play scene
-  // Window/sky region:  y = 0..60   (small slit at top of cabin wall)
-  // Cabin wall:         y = 60..130
-  // Table edge top:     y = 130
-  // Table surface:      y = 130..230  (oval visible area)
-  // Foreground floor:   y = 230..270
+  // Layout constants for the play scene. LAYOUT.* gives positions/regions
+  // expressed as functions of current W, H so portrait switching just works.
+  // Y-region presets — different per orientation.
+  let LAYOUT = null;
+  function recomputeLayout() {
+    const isPortrait = H > W;
+    if (isPortrait) {
+      LAYOUT = {
+        skyEnd: Math.round(H * 0.14),         // ~67px on 480 portrait
+        wallStart: Math.round(H * 0.14),
+        wallEnd: Math.round(H * 0.40),         // before table starts
+        tableY: Math.round(H * 0.55),          // mid-screen
+        floorStart: Math.round(H * 0.95),
+        lanternX: Math.round(W * 0.18),
+        lanternY: Math.round(H * 0.06),
+        oceanY: Math.round(H * 0.10),
+        krakenCount: 2,
+        krakenSpacing: Math.round(W / 3),
+      };
+      TABLE.cx = W/2;
+      TABLE.cy = Math.round(H * 0.55);
+      TABLE.rx = Math.round(W * 0.40);
+      TABLE.ry = Math.round(H * 0.28);
+    } else {
+      LAYOUT = {
+        skyEnd: 60,
+        wallStart: 66,
+        wallEnd: 130,
+        tableY: 165,
+        floorStart: 230,
+        lanternX: 60,
+        lanternY: 20,
+        oceanY: 42,
+        krakenCount: 3,
+        krakenSpacing: 150,
+      };
+      TABLE.cx = W/2;
+      TABLE.cy = 175;
+      TABLE.rx = 175;
+      TABLE.ry = 50;
+    }
+  }
+
   const TABLE = { cx: W/2, cy: 175, rx: 175, ry: 50 };
+  recomputeLayout();
 
   function drawWindow(dt) {
     elapsed += dt;
@@ -2038,25 +2950,32 @@ const SCENE = (() => {
     if (lightningNext <= 0) {
       flash();
       lightningNext = 5 + Math.random()*10;
-      if (window.AUDIO) AUDIO.thunder();
+      // Soft electric crackle synced to the visual flash, then a delayed
+      // distant thunder rumble for natural separation (light ↔ sound delay).
+      if (window.AUDIO) {
+        AUDIO.lightningCrack();
+        setTimeout(() => AUDIO.thunder(), 280 + Math.random()*200);
+      }
     }
+    const skyEnd = LAYOUT.skyEnd;
     // Sky
-    const skyGrad = ctx.createLinearGradient(0,0,0,60);
+    const skyGrad = ctx.createLinearGradient(0,0,0,skyEnd);
     skyGrad.addColorStop(0, '#070712');
     skyGrad.addColorStop(1, '#141428');
     ctx.fillStyle = skyGrad;
-    ctx.fillRect(0,0,W,60);
+    ctx.fillRect(0,0,W,skyEnd);
     // Distant raging ocean
     for (let x = 0; x < W; x += 2) {
       const wave = Math.sin(x*0.06 + krakenT*1.2)*2 + Math.sin(x*0.13 + krakenT*0.7)*1.5;
       ctx.fillStyle = '#0a1424';
-      ctx.fillRect(x, 42 + wave, 2, 18 - wave);
+      ctx.fillRect(x, LAYOUT.oceanY + wave, 2, (skyEnd - LAYOUT.oceanY) - wave);
     }
     // Kraken tentacle silhouettes
-    for (let i = 0; i < 3; i++) {
-      const baseX = 80 + i*150;
+    for (let i = 0; i < LAYOUT.krakenCount; i++) {
+      const baseX = LAYOUT.krakenSpacing/2 + i*LAYOUT.krakenSpacing;
       ctx.fillStyle = '#091a14';
-      for (let y = 0; y < 40; y++) {
+      const tentH = Math.min(40, skyEnd - 18);
+      for (let y = 0; y < tentH; y++) {
         const sway = Math.sin(krakenT*1.5 + y*0.18 + i)*6;
         const w = Math.max(2, 12 - y*0.18);
         ctx.fillRect(baseX + sway - w/2, 18 + y, w, 1);
@@ -2065,11 +2984,11 @@ const SCENE = (() => {
     // Lightning flash inside the window slit
     if (lightningT > 0) {
       ctx.fillStyle = `rgba(180,200,255,${lightningT*0.55})`;
-      ctx.fillRect(0,0,W,60);
+      ctx.fillRect(0,0,W,skyEnd);
       if (lightningT > 0.4) {
         ctx.fillStyle = '#fff';
         let bx = 60 + Math.random()*(W-120);
-        for (let by = 0; by < 50; by += 3) {
+        for (let by = 0; by < skyEnd - 10; by += 3) {
           ctx.fillRect(bx, by, 2, 4);
           bx += (Math.random()-0.5)*8;
         }
@@ -2079,37 +2998,40 @@ const SCENE = (() => {
     ctx.fillStyle = '#a0b0c0';
     for (let p of rain) {
       p.y += 90*dt; p.x -= 30*dt;
-      if (p.y > 60) { p.y = -2; p.x = Math.random()*W; }
+      if (p.y > skyEnd) { p.y = -2; p.x = Math.random()*W; }
       if (p.x < 0) p.x += W;
-      if (p.y < 60) ctx.fillRect(p.x|0, p.y|0, 1, 2 + (p.s|0));
+      if (p.y < skyEnd) ctx.fillRect(p.x|0, p.y|0, 1, 2 + (p.s|0));
     }
     // Window frame
     ctx.fillStyle = '#3a2410';
     ctx.fillRect(0,0,W,4);
-    ctx.fillRect(0,58,W,8);
+    ctx.fillRect(0,skyEnd-2,W,8);
     ctx.fillStyle = '#5a3818';
     ctx.fillRect(0,4,W,2);
-    ctx.fillRect(0,66,W,1);
+    ctx.fillRect(0,skyEnd+6,W,1);
     // Window crossbars (vertical)
     ctx.fillStyle = '#3a2410';
-    for (let x = W/4; x < W; x += W/4) ctx.fillRect(x|0, 0, 3, 60);
+    for (let x = W/4; x < W; x += W/4) ctx.fillRect(x|0, 0, 3, skyEnd);
   }
 
   function drawCabinWall() {
     // Wall above table
-    for (let py = 66; py < 130; py += 8) {
-      ctx.fillStyle = py % 16 === 66 ? '#3a2410' : '#2a1808';
+    const wallStart = LAYOUT.wallStart;
+    const wallEnd = LAYOUT.wallEnd;
+    for (let py = wallStart; py < wallEnd; py += 8) {
+      ctx.fillStyle = (py - wallStart) % 16 === 0 ? '#3a2410' : '#2a1808';
       ctx.fillRect(0, py, W, 8);
       ctx.fillStyle = '#1a1004';
       ctx.fillRect(0, py+7, W, 1);
     }
     ctx.fillStyle = '#1a1004';
-    for (let px = 0; px < W; px += 40) ctx.fillRect(px, 66, 1, 64);
+    for (let px = 0; px < W; px += 40) ctx.fillRect(px, wallStart, 1, wallEnd - wallStart);
     // Foreground floor
+    const floorStart = LAYOUT.floorStart;
     ctx.fillStyle = '#1a0c04';
-    ctx.fillRect(0, 230, W, 40);
+    ctx.fillRect(0, floorStart, W, H - floorStart);
     ctx.fillStyle = '#0a0402';
-    ctx.fillRect(0, 230, W, 2);
+    ctx.fillRect(0, floorStart, W, 2);
   }
 
   // Static atmosphere on the wall
@@ -2669,7 +3591,7 @@ const SCENE = (() => {
 
   function drawLantern(t) {
     const flicker = 1 + (Math.random()-0.5)*0.18 + Math.sin(t*9)*0.05;
-    const lx = 70, ly = 30;
+    const lx = LAYOUT.lanternX, ly = LAYOUT.lanternY;
     const sway = Math.sin(t*1.5)*2;
     ctx.fillStyle = '#1a1004';
     ctx.fillRect(lx, 0, 1, ly);
@@ -2727,7 +3649,11 @@ const SCENE = (() => {
     if (lightningNext <= 0) {
       flash();
       lightningNext = 3 + Math.random()*5;
-      if (window.AUDIO) AUDIO.thunder();
+      // Crack first (with the flash), thunder rumbles in afterwards
+      if (window.AUDIO) {
+        AUDIO.lightningCrack();
+        setTimeout(() => AUDIO.thunder(), 320 + Math.random()*240);
+      }
     }
     const skyGrad = ctx.createLinearGradient(0,0,0,H);
     skyGrad.addColorStop(0, '#080814');
@@ -2766,34 +3692,122 @@ const SCENE = (() => {
       if (p.x < 0) p.x += W;
       ctx.fillRect(p.x|0, p.y|0, 1, 3);
     }
-    // Ship
+    // Ship — The Flying Dutchman.
+    // Scale generously so it dominates the viewport on portrait mobile.
+    // Reference width = 100 in old design; new base ~ 0.75*W bounded by H.
     ctx.save();
-    ctx.translate(W/2, horizonY + 12 + Math.sin(elapsed*1.4)*4);
-    ctx.rotate(Math.sin(elapsed*1.6)*0.18);
-    ctx.fillStyle = '#3a2410';
-    ctx.fillRect(-50, -8, 100, 14);
-    ctx.fillStyle = '#1a0a04';
-    for (let x = -42; x <= 42; x += 14) ctx.fillRect(x, -2, 4, 4);
-    ctx.fillStyle = '#2a1808';
-    ctx.fillRect(-2, -52, 4, 50);
-    ctx.fillRect(-32, -42, 3, 40);
-    ctx.fillRect(28, -42, 3, 40);
-    ctx.fillStyle = '#3a3024';
-    ctx.fillRect(-22, -48, 44, 32);
-    ctx.fillRect(-44, -38, 24, 22);
-    ctx.fillRect(20, -38, 24, 22);
-    // Jolly Roger
-    ctx.fillStyle = '#1a0a04';
-    ctx.fillRect(0, -58, 14, 8);
+    const isPortrait = H > W;
+    const baseScale = isPortrait
+      ? Math.min(W / 140, H / 220)
+      : Math.min(W / 200, H / 130);
+    const s = baseScale;
+    ctx.translate(W/2, horizonY + 16*s + Math.sin(elapsed*1.4)*4);
+    ctx.rotate(Math.sin(elapsed*1.6)*0.16);
+    ctx.scale(s, s);
+
+    // ----- Hull (weathered green-black, barnacle waterline) -----
+    // Lower waterline (slightly lighter, rotted)
+    ctx.fillStyle = '#0a1208';
+    ctx.fillRect(-58, -2, 116, 16);
+    // Main hull
+    ctx.fillStyle = '#1a2818';
+    ctx.fillRect(-54, -10, 108, 12);
+    // Upper deck rail
+    ctx.fillStyle = '#0a0a04';
+    ctx.fillRect(-50, -14, 100, 4);
+    // Barnacle / coral specks along waterline
+    ctx.fillStyle = '#3a4a30';
+    for (let x = -54; x <= 50; x += 6) {
+      const j = ((x*7) % 5) - 2;
+      ctx.fillRect(x, 4 + j, 3, 2);
+    }
+    ctx.fillStyle = '#2a3a20';
+    for (let x = -50; x <= 46; x += 8) ctx.fillRect(x, 8, 4, 2);
+    // Gun port row — eerie amber glow
+    const portGlow = 0.7 + 0.3*Math.sin(elapsed*3);
+    ctx.fillStyle = `rgba(255,160,40,${portGlow})`;
+    for (let x = -44; x <= 38; x += 14) ctx.fillRect(x, -6, 4, 4);
+    ctx.fillStyle = '#ff8030';
+    for (let x = -44; x <= 38; x += 14) ctx.fillRect(x+1, -5, 2, 2);
+    // Stern castle (rear lift)
+    ctx.fillStyle = '#0a1408';
+    ctx.fillRect(36, -20, 22, 10);
+    ctx.fillStyle = '#1a2818';
+    ctx.fillRect(38, -18, 18, 6);
+    // Bowsprit jutting forward
+    ctx.fillStyle = '#1a1004';
+    ctx.fillRect(-66, -16, 16, 3);
+    // Tattered jib
+    ctx.fillStyle = '#2a2418';
+    ctx.fillRect(-62, -22, 10, 6);
+    ctx.fillStyle = '#1a1408';
+    ctx.fillRect(-58, -20, 2, 4);
+
+    // ----- 3 Masts -----
+    ctx.fillStyle = '#1a1004';
+    ctx.fillRect(-1, -78, 3, 64); // mainmast
+    ctx.fillRect(-32, -64, 3, 50); // foremast
+    ctx.fillRect(28, -62, 3, 48); // mizzenmast
+    // Yards (horizontal spars)
+    ctx.fillRect(-22, -68, 46, 2);
+    ctx.fillRect(-22, -52, 46, 2);
+    ctx.fillRect(-44, -56, 26, 2);
+    ctx.fillRect(18, -54, 28, 2);
+
+    // ----- Tattered sails -----
+    // Mainsail upper (frayed/holed)
+    function tatteredSail(x0, y0, w, h, dark) {
+      ctx.fillStyle = dark ? '#202418' : '#2a2e22';
+      ctx.fillRect(x0, y0, w, h);
+      // Frayed bottom edge
+      ctx.fillStyle = '#0a0c08';
+      for (let i = 0; i < w; i += 3) {
+        const cut = (Math.sin((i+x0)*0.7 + elapsed*0.5) + 1) * 2 + 1;
+        ctx.fillRect(x0+i, y0+h-cut, 2, cut);
+      }
+      // Holes / tears
+      ctx.fillStyle = '#0a0c08';
+      const holes = Math.max(2, Math.floor(w*h/120));
+      for (let i = 0; i < holes; i++) {
+        const hx = x0 + ((i*13)%w);
+        const hy = y0 + 2 + ((i*7)%(h-4));
+        ctx.fillRect(hx, hy, 2, 2);
+      }
+    }
+    tatteredSail(-22, -68, 46, 16, false); // main top
+    tatteredSail(-22, -52, 46, 18, true);  // main bottom
+    tatteredSail(-44, -56, 26, 14, false); // foresail
+    tatteredSail(18, -54, 28, 14, true);   // mizzen
+    // Vertical rigging lines
+    ctx.fillStyle = '#0a0a04';
+    for (let mx of [-32, 0, 30]) {
+      ctx.fillRect(mx-10, -68, 1, 56);
+      ctx.fillRect(mx+10, -68, 1, 56);
+    }
+    // Crossing rigging (subtle X over each sail)
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-22,-68); ctx.lineTo(24,-36);
+    ctx.moveTo(24,-68); ctx.lineTo(-22,-36);
+    ctx.stroke();
+
+    // ----- Skeletal pirate flag at mainmast peak -----
+    ctx.fillStyle = '#1a1004';
+    ctx.fillRect(0, -86, 16, 9);
+    // Skull
     ctx.fillStyle = '#f4e8c8';
-    ctx.fillRect(4, -56, 4, 4);
-    ctx.fillRect(3, -52, 6, 1);
+    ctx.fillRect(5, -84, 6, 5);
+    ctx.fillRect(4, -82, 8, 1);
+    // Crossbones
+    ctx.fillRect(3, -78, 10, 1);
+    ctx.fillRect(2, -77, 2, 1);
+    ctx.fillRect(12, -77, 2, 1);
+    // Eyes
     ctx.fillStyle = '#000';
-    ctx.fillRect(5, -55, 1, 1);
-    ctx.fillRect(7, -55, 1, 1);
-    // Portholes glow
-    ctx.fillStyle = '#ffa040';
-    for (let x = -30; x <= 30; x += 15) ctx.fillRect(x, -2, 2, 2);
+    ctx.fillRect(6, -83, 1, 2);
+    ctx.fillRect(9, -83, 1, 2);
+
     ctx.restore();
     // Vignette
     const vg = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.95);
@@ -2803,7 +3817,88 @@ const SCENE = (() => {
     ctx.fillRect(0,0,W,H);
   }
 
-  return { ctx, W, H, drawScene, drawTitle, flash, TABLE };
+  // Switch canvas dimensions + recompute layout (and re-rain) when the
+  // viewport orientation changes. Public so MOBILE can call it.
+  function setOrientation(mode) {
+    const wantPortrait = (mode === 'portrait');
+    const isPortrait = canvas.height > canvas.width;
+    if (wantPortrait === isPortrait) return; // already in target mode
+    if (wantPortrait) {
+      canvas.width = 270;
+      canvas.height = 480;
+    } else {
+      canvas.width = 480;
+      canvas.height = 270;
+    }
+    W = canvas.width;
+    H = canvas.height;
+    ctx.imageSmoothingEnabled = false;
+    recomputeLayout();
+    rebuildRain();
+    // Repopulate atmospherics anchored to W/H
+    rebuildAtmospherics();
+    // Tell the game to redo seat positions for the new TABLE
+    if (window.assignSeats && window.state && window.state.players && window.state.players.length) {
+      try { assignSeats(); } catch (e) {}
+    }
+  }
+  // Wallgrowth/specks/drapes are seeded based on W/H — rebuild them on resize.
+  function rebuildAtmospherics() {
+    // (Functions in this scope are closure-bound to the original arrays;
+    // we mutate the arrays in place by re-running the seeders if defined.)
+    if (typeof rebuildWallGrowth === 'function') rebuildWallGrowth();
+    if (typeof rebuildBioSpecks === 'function') rebuildBioSpecks();
+    if (typeof rebuildHangingDrapes === 'function') rebuildHangingDrapes();
+  }
+  // === Gauntlet atmospheric escalation ===
+  // 0 = no override (default match scene). 1-5 = round-tier overrides applied
+  // to sky tint, lightning frequency, rain density, screen tint, ship rocking.
+  let gntRound = 0;
+  function setGauntletAtmosphere(r) {
+    gntRound = (r || 0) | 0;
+    // R5: tighten lightning to every 3-8s. R4: every 6-12s.
+    if (gntRound === 5) lightningNext = Math.min(lightningNext, 1 + Math.random()*3);
+    else if (gntRound === 4) lightningNext = Math.min(lightningNext, 3 + Math.random()*5);
+  }
+  function getGauntletRound() { return gntRound; }
+  // Atmosphere tint overlay applied AFTER drawScene per round.
+  function drawAtmosphereTint() {
+    if (!gntRound) return;
+    const tints = [null,
+      'rgba(255,180,80,0.0)',   // R1 nothing
+      'rgba(180,90,60,0.10)',   // R2 amber
+      'rgba(80,100,160,0.18)',  // R3 cool grey
+      'rgba(60,40,100,0.30)',   // R4 stormy purple
+      'rgba(20,40,30,0.38)',    // R5 green-tint, ghostly
+    ];
+    const tint = tints[Math.max(1, Math.min(5, gntRound))];
+    if (tint) {
+      ctx.fillStyle = tint;
+      ctx.fillRect(0, 0, W, H);
+    }
+    // R5 — heavy vignette, ghostly green hint
+    if (gntRound === 5) {
+      const vg = ctx.createRadialGradient(W/2, H*0.55, H*0.25, W/2, H*0.55, H*1.0);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+  // Wrap drawScene to apply tint after rendering.
+  const _origDrawScene = drawScene;
+  drawScene = function(dt) {
+    // Boost lightning frequency for gauntlet R4-R5 in the cabin window
+    _origDrawScene(dt);
+    drawAtmosphereTint();
+  };
+  return {
+    ctx,
+    get W() { return W; },
+    get H() { return H; },
+    drawScene, drawTitle, flash, TABLE, setOrientation, LAYOUT: () => LAYOUT,
+    setGauntletAtmosphere, getGauntletRound,
+  };
 })();
 
 //----------------------------------------------------------------
@@ -2982,6 +4077,36 @@ const AUDIO = (() => {
     const w = ac.createGain(); w.gain.value=0.55; g.connect(w); w.connect(reverb);
     src.start(t0); src.stop(t0+dur);
   }
+  // Soft electric crackle — the actual lightning sound (different from the
+  // distant thunder rumble). Plays on every flash for tight visual sync.
+  function lightningCrack() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    const dur = 0.18 + Math.random()*0.08;
+    // High-frequency white noise burst → bandpass for that "electric" character
+    const bs = Math.max(1, Math.floor(ac.sampleRate*dur));
+    const buf = ac.createBuffer(1, bs, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bs; i++) d[i] = (Math.random()*2-1) * 0.7;
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 4500 + Math.random()*1500;
+    bp.Q.value = 2.5;
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 2000;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.18, t0 + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(hp); hp.connect(bp); bp.connect(g); g.connect(masterGain);
+    // Light reverb tail for atmosphere
+    if (reverb) {
+      const w = ac.createGain(); w.gain.value = 0.35;
+      g.connect(w); w.connect(reverb);
+    }
+    src.start(t0); src.stop(t0 + dur + 0.02);
+  }
   function dice() {
     if (!ac || muted) return;
     for (let n = 0; n < 5; n++) {
@@ -3136,7 +4261,210 @@ const AUDIO = (() => {
     sub.start(t0); sub.stop(t0+0.5);
   }
   function setMuted(m) { muted = m; if (masterGain) masterGain.gain.value = m ? 0 : 0.7; }
-  return { init, thunder, dice, blip, fanfare, slam, heartbeat, winSting, loseSting, wail, tableThump, setMuted, get muted(){return muted;} };
+  // === Gauntlet match audio tier ===
+  // Scales rain, wind, and shanty by round so the ambience escalates.
+  // Round 0 = default (no override).
+  let _matchTier = 0;
+  function setMatchTier(round) {
+    _matchTier = round || 0;
+    if (!ac) return;
+    // Tables: rain density, wind howl, shanty volume (lower in late rounds).
+    const rainTable   = [0.07, 0.07, 0.10, 0.16, 0.22, 0.28];
+    const windTable   = [0.05, 0.05, 0.08, 0.12, 0.18, 0.24];
+    const shantyTable = [0.16, 0.16, 0.14, 0.10, 0.06, 0.03];
+    const r = Math.max(0, Math.min(5, _matchTier));
+    if (rainGain)   rainGain.gain.linearRampToValueAtTime(rainTable[r], ac.currentTime + 0.6);
+    if (windGain)   windGain.gain.linearRampToValueAtTime(windTable[r], ac.currentTime + 0.6);
+    if (musicGain)  musicGain.gain.linearRampToValueAtTime(shantyTable[r], ac.currentTime + 0.6);
+    // R5: start a procedural minor-key dirge layered under the muted shanty.
+    if (r === 5 && !_dirgeOn) startDirge();
+    if (r !== 5 && _dirgeOn) stopDirge();
+  }
+  // === R5 minor-key dirge ===
+  // Procedural slow drone + low-brass-like saw that pulses with the storm.
+  // We layer this UNDER the now-quiet shanty so the corruption is felt.
+  let _dirgeNodes = null, _dirgeOn = false;
+  function startDirge() {
+    if (!ac || _dirgeOn) return;
+    _dirgeOn = true;
+    const t0 = ac.currentTime;
+    // Sustained low D drone
+    const drone = ac.createOscillator(); drone.type='sawtooth'; drone.frequency.value = 73.42;
+    const droneG = ac.createGain(); droneG.gain.value = 0;
+    droneG.gain.linearRampToValueAtTime(0.07, t0 + 1.5);
+    const dlp = ac.createBiquadFilter(); dlp.type='lowpass'; dlp.frequency.value = 250;
+    drone.connect(dlp); dlp.connect(droneG); droneG.connect(masterGain);
+    drone.start(t0);
+    // Slow ascending-descending dirge motif (4 bars, ~6s)
+    // D minor — d, f, a, d, c, a, f, d (with held octave)
+    const motif = [73.42, 87.31, 110, 146.83, 130.81, 110, 87.31, 73.42];
+    const stepDur = 0.85;
+    let bar = 0;
+    function scheduleBar() {
+      if (!_dirgeOn) return;
+      const start = ac.currentTime + 0.05;
+      motif.forEach((f, i) => {
+        const o = ac.createOscillator(); o.type='triangle'; o.frequency.value = f;
+        const g = ac.createGain(); g.gain.value = 0;
+        const tt = start + i*stepDur;
+        g.gain.setValueAtTime(0, tt);
+        g.gain.linearRampToValueAtTime(0.045, tt + 0.05);
+        g.gain.exponentialRampToValueAtTime(0.001, tt + stepDur*0.9);
+        o.connect(g); g.connect(musicGain);
+        const w = ac.createGain(); w.gain.value = 0.6; g.connect(w); w.connect(reverb);
+        o.start(tt); o.stop(tt + stepDur);
+      });
+      bar++;
+      if (_dirgeOn) setTimeout(scheduleBar, motif.length * stepDur * 1000);
+    }
+    scheduleBar();
+    _dirgeNodes = { drone, droneG };
+  }
+  function stopDirge() {
+    if (!_dirgeOn) return;
+    _dirgeOn = false;
+    if (_dirgeNodes && _dirgeNodes.droneG && ac) {
+      _dirgeNodes.droneG.gain.linearRampToValueAtTime(0, ac.currentTime + 0.8);
+      try { setTimeout(() => _dirgeNodes.drone.stop(), 1000); } catch(e){}
+    }
+    _dirgeNodes = null;
+  }
+  // ---- Gauntlet SFX ----
+  // Soft typewriter click — short noise burst, 8-bit feel.
+  function typewriter() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    const o = ac.createOscillator(); const g = ac.createGain();
+    o.type = 'square'; o.frequency.value = 800 + Math.random()*200;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.04, t0+0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+0.04);
+    o.connect(g); g.connect(sfxGain);
+    o.start(t0); o.stop(t0+0.05);
+  }
+  // Coin clink — bright metallic, ascending two-tone for completion.
+  function coinClink() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    [880, 1760].forEach((f, i) => {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      const start = t0 + i*0.06;
+      g.gain.setValueAtTime(0, start);
+      g.gain.linearRampToValueAtTime(0.16, start+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, start+0.35);
+      o.connect(g); g.connect(sfxGain);
+      const w = ac.createGain(); w.gain.value = 0.5; g.connect(w); w.connect(reverb);
+      o.start(start); o.stop(start+0.4);
+    });
+  }
+  // Ocean swell — low rumble + wash. Used on soul-backstory entry.
+  function oceanSwell() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    // Low rumble
+    const o = ac.createOscillator(); const g = ac.createGain();
+    o.type = 'sine'; o.frequency.value = 50;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.18, t0+0.6);
+    g.gain.exponentialRampToValueAtTime(0.001, t0+2.2);
+    o.connect(g); g.connect(masterGain);
+    o.start(t0); o.stop(t0+2.4);
+    // Wash via filtered noise burst
+    const bs = ac.sampleRate * 2.4;
+    const buf = ac.createBuffer(1, bs, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bs; i++) {
+      const env = Math.sin((i/bs)*Math.PI);
+      d[i] = (Math.random()*2-1) * 0.3 * env;
+    }
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const lp = ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=400;
+    const wg = ac.createGain(); wg.gain.value = 0.3;
+    src.connect(lp); lp.connect(wg); wg.connect(masterGain);
+    const wgr = ac.createGain(); wgr.gain.value = 0.5; wg.connect(wgr); wgr.connect(reverb);
+    src.start(t0);
+  }
+  // Triumphant fanfare — bright major arpeggio + sustained chord.
+  function triumphFanfare() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    const arp = [261.63, 329.63, 392.0, 523.25, 659.25, 783.99, 1046.5];
+    arp.forEach((f, i) => {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type = 'square'; o.frequency.value = f;
+      const start = t0 + i*0.075;
+      g.gain.setValueAtTime(0, start);
+      g.gain.linearRampToValueAtTime(0.14, start+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, start+0.45);
+      o.connect(g); g.connect(sfxGain);
+      const w = ac.createGain(); w.gain.value = 0.5; g.connect(w); w.connect(reverb);
+      o.start(start); o.stop(start+0.5);
+    });
+    // Sustained chord at end
+    [261.63, 329.63, 392.0, 523.25].forEach(f => {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      const start = t0 + 0.6;
+      g.gain.setValueAtTime(0, start);
+      g.gain.linearRampToValueAtTime(0.08, start+0.05);
+      g.gain.exponentialRampToValueAtTime(0.001, start+1.8);
+      o.connect(g); g.connect(sfxGain);
+      const w = ac.createGain(); w.gain.value = 0.6; g.connect(w); w.connect(reverb);
+      o.start(start); o.stop(start+2);
+    });
+  }
+  // Soul take — descending dissonant cascade, ghostly shimmer.
+  function soulTake() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    [440, 415.3, 369.99, 311.13, 261.63, 207.65, 174.61, 138.59].forEach((f, i) => {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      const start = t0 + i*0.13;
+      g.gain.setValueAtTime(0, start);
+      g.gain.linearRampToValueAtTime(0.14, start+0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, start+0.55);
+      o.connect(g); g.connect(sfxGain);
+      const w = ac.createGain(); w.gain.value = 0.7; g.connect(w); w.connect(reverb);
+      o.start(start); o.stop(start+0.6);
+    });
+    // Ghostly hiss
+    const bs = ac.sampleRate * 1.6;
+    const buf = ac.createBuffer(1, bs, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bs; i++) {
+      d[i] = (Math.random()*2-1) * 0.25 * (1 - i/bs);
+    }
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const bp = ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value = 600; bp.Q.value = 4;
+    const ng = ac.createGain(); ng.gain.value = 0.5;
+    src.connect(bp); bp.connect(ng); ng.connect(masterGain);
+    src.start(t0);
+  }
+  // Davy laugh — low gravelly oscillation.
+  function davyLaugh() {
+    if (!ac || muted) return;
+    const t0 = ac.currentTime;
+    [73.42, 82.41, 73.42, 82.41, 73.42].forEach((f, i) => {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type = 'sawtooth'; o.frequency.value = f;
+      const lp = ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 400;
+      const start = t0 + i*0.12;
+      g.gain.setValueAtTime(0, start);
+      g.gain.linearRampToValueAtTime(0.22, start+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, start+0.18);
+      o.connect(lp); lp.connect(g); g.connect(masterGain);
+      const w = ac.createGain(); w.gain.value = 0.6; g.connect(w); w.connect(reverb);
+      o.start(start); o.stop(start+0.22);
+    });
+  }
+  return {
+    init, thunder, lightningCrack, dice, blip, fanfare, slam, heartbeat,
+    winSting, loseSting, wail, tableThump, setMuted, get muted(){return muted;},
+    typewriter, coinClink, oceanSwell, triumphFanfare, soulTake, davyLaugh,
+    setMatchTier,
+  };
 })();
 
 //----------------------------------------------------------------
@@ -3418,7 +4746,13 @@ function aiDecide(player) {
   const myMatches = myDice.filter(d => d === state.bid.face || (state.bid.face !== 1 && d === 1)).length;
   const need = state.bid.qty - myMatches;
   const probTrue = probAtLeast(need, unknown, state.bid.face);
-  if (probTrue < player.ai.callTreshold) return { type: 'liar' };
+  // Davy R5 "tell-reading": when the player just bid as a bluff, Davy is
+  // more likely to call. Boost his effective call threshold for this turn.
+  let effectiveCallThreshold = player.ai.callTreshold;
+  if (player.id === 'davy' && window.GAUNTLET && GAUNTLET.getDavyBluffBoost) {
+    effectiveCallThreshold += GAUNTLET.getDavyBluffBoost();
+  }
+  if (probTrue < effectiveCallThreshold) return { type: 'liar' };
   const aggro = player.ai.aggro;
   const candidates = [];
   candidates.push({ qty: state.bid.qty + 1, face: state.bid.face });
@@ -3690,6 +5024,11 @@ function callLiar() {
   state.crewGasp = 1.0; state.crewReact = 1.0;
   SCENE.flash();
   setTimeout(() => SCENE.flash(), 220);
+  // Layered electric crackles to match the double-flash drama of a LIAR call
+  if (window.AUDIO) {
+    AUDIO.lightningCrack();
+    setTimeout(() => AUDIO.lightningCrack(), 220);
+  }
   state.phase = 'reveal';
   const dicePerPlayer = {};
   for (const p of state.players) if (p.alive) dicePerPlayer[p.id] = [...p.dice];
@@ -3697,6 +5036,12 @@ function callLiar() {
   const claimed = state.bid.qty;
   const bidderTruthful = actual >= claimed;
   const loser = bidderTruthful ? caller : bidder;
+  // Gauntlet: track whether the human just bluffed (for Davy R5 tells).
+  try {
+    if (window.GAUNTLET && GAUNTLET.recordBluffOutcome) {
+      GAUNTLET.recordBluffOutcome(bidder, state.bid, actual);
+    }
+  } catch(e){}
   // Build scatter trajectory for every die — they'll fly from each player's
   // cup onto the table center in arcing parabolas, then settle.
   const scatter = [];
@@ -3834,6 +5179,12 @@ function doAITurn() {
   const p = currentPlayer();
   if (!p.isAI || !p.alive) return;
   const decision = aiDecide(p);
+  // Gauntlet R5: Davy talks trash mid-match.
+  try {
+    if (window.GAUNTLET && GAUNTLET.maybeFireDavyTaunt) {
+      GAUNTLET.maybeFireDavyTaunt(p, decision);
+    }
+  } catch(e){}
   if (decision.type === 'liar') callLiar();
   else placeBid(decision.qty, decision.face);
 }
@@ -4255,6 +5606,46 @@ function drawEffects(dt) {
       }
       ctx.globalAlpha = 1;
     }
+    if (e.type === 'tauntBubble') {
+      // Float up + fade out. Render as speech bubble above Davy's head.
+      const u = Math.min(1, e.t / 0.3);
+      const ease = 1 - Math.pow(1-u, 3);
+      const yOffset = -10 - 6*ease;
+      const fadeIn = u;
+      const fadeOut = e.t > e.life - 0.6 ? Math.max(0, (e.life - e.t)/0.6) : 1;
+      ctx.globalAlpha = fadeIn * fadeOut;
+      const text = e.text || '';
+      ctx.font = '7px "Press Start 2P"';
+      const tw = ctx.measureText(text).width;
+      const padX = 5, padY = 4;
+      const bw = tw + padX*2;
+      const bh = 14;
+      const bx = e.x - bw/2;
+      const by = e.y + yOffset - bh;
+      // Bubble background (dark with red border for menace)
+      ctx.fillStyle = '#1a0608';
+      ctx.fillRect(bx-1, by-1, bw+2, bh+2);
+      ctx.fillStyle = '#0a0204';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = '#c83020';
+      ctx.fillRect(bx, by, bw, 1);
+      ctx.fillRect(bx, by+bh-1, bw, 1);
+      ctx.fillRect(bx, by, 1, bh);
+      ctx.fillRect(bx+bw-1, by, 1, bh);
+      // Tail pointing down
+      ctx.fillStyle = '#0a0204';
+      ctx.fillRect(e.x-2, by+bh, 4, 3);
+      ctx.fillStyle = '#c83020';
+      ctx.fillRect(e.x-2, by+bh+2, 4, 1);
+      ctx.fillRect(e.x-2, by+bh, 1, 3);
+      ctx.fillRect(e.x+1, by+bh, 1, 3);
+      // Text
+      ctx.fillStyle = '#f4d27a';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, e.x, by + 9);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
     if (e.type === 'liarSlam') {
       const u = Math.min(1, e.t / 0.25);
       const ease = 1 - Math.pow(1-u, 4);
@@ -4345,10 +5736,10 @@ function buildAvatarGrid(opts={}) {
     if (taken.has(a.id)) card.classList.add('locked');
     card.dataset.id = a.id;
     const c = document.createElement('canvas');
-    c.width = 32; c.height = 32;
+    c.width = 64; c.height = 64;
     const cx = c.getContext('2d');
     cx.imageSmoothingEnabled = false;
-    drawSpriteAt(cx, a.sprite, 0, 0, 32);
+    drawSpriteAt(cx, a.sprite, 0, 0, 64);
     card.appendChild(c);
     const nm = document.createElement('div'); nm.className = 'ai-name'; nm.textContent = a.name;
     card.appendChild(nm);
@@ -4382,10 +5773,10 @@ function buildAIGrid() {
     card.className = 'ai-card';
     card.dataset.id = p.id;
     const c = document.createElement('canvas');
-    c.width = 32; c.height = 32;
+    c.width = 64; c.height = 64;
     const ctx = c.getContext('2d');
     ctx.imageSmoothingEnabled = false;
-    drawSpriteAt(ctx, p.sprite, 0, 0, 32);
+    drawSpriteAt(ctx, p.sprite, 0, 0, 64);
     card.appendChild(c);
     const nm = document.createElement('div'); nm.className = 'ai-name'; nm.textContent = p.name; card.appendChild(nm);
     const tr = document.createElement('div'); tr.className = 'ai-trait'; tr.textContent = p.trait; card.appendChild(tr);
@@ -4505,6 +5896,9 @@ function showTitle() {
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('curtain').classList.add('hidden');
   document.getElementById('gameover-overlay').classList.add('hidden');
+  // Title screen needs the canvas visible so the storm/ship backdrop animates
+  // (transparent gradient at top of title overlay lets canvas show through).
+  document.body.classList.add('on-title');
 }
 function showSetup() {
   state.appPhase = 'setup';
@@ -4513,6 +5907,7 @@ function showSetup() {
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('curtain').classList.add('hidden');
   document.getElementById('gameover-overlay').classList.add('hidden');
+  document.body.classList.remove('on-title');
   const startBtn = document.getElementById('btn-start');
   if (startBtn) startBtn.textContent = 'SET SAIL';
   applyMode(state.mode);
@@ -4816,6 +6211,7 @@ function showOnlineLobby() {
   document.getElementById('title-screen').classList.add('hidden');
   document.getElementById('online-join').classList.add('hidden');
   document.getElementById('online-lobby').classList.remove('hidden');
+  document.body.classList.remove('on-title');
   // Toggle host-only / client-only sections
   for (const el of document.querySelectorAll('.host-only')) {
     el.classList.toggle('hidden', ONLINE.mode !== 'host');
@@ -4831,6 +6227,7 @@ function showOnlineJoin() {
   document.getElementById('title-screen').classList.add('hidden');
   document.getElementById('online-lobby').classList.add('hidden');
   document.getElementById('online-join').classList.remove('hidden');
+  document.body.classList.remove('on-title');
   document.getElementById('join-code-input').value = '';
   document.getElementById('join-code-input').focus();
 }
@@ -5088,9 +6485,13 @@ async function clientJoin(code) {
 // Picker UI overlaying the lobby — uses a temporary modal
 async function pickAvatarAndName() {
   return new Promise(resolve => {
-    // Use the existing menu structure as a quick char select
+    // Use the existing menu structure as a quick char select.
+    // For online JOIN flow we hide everything except: avatar grid + name + JOIN button.
     document.getElementById('menu').classList.remove('hidden');
-    document.querySelector('#menu h1').textContent = 'PICK YER CAPTAIN';
+    document.querySelector('#menu h1').textContent = 'JOIN ONLINE TABLE';
+    // Hide GAME MODE selector — the joiner doesn't pick mode, they just pick a captain.
+    const modeSection = document.getElementById('game-mode-section');
+    if (modeSection) modeSection.style.display = 'none';
     document.getElementById('multi-config').style.display = 'none';
     document.getElementById('opponent-label').parentElement.style.display = 'none';
     document.getElementById('avatar-section').style.display = 'block';
@@ -5109,16 +6510,20 @@ async function pickAvatarAndName() {
       },
     });
     const oldStartHandler = document.getElementById('btn-start').onclick;
+    function restoreMenu() {
+      // Restore the GAME MODE section so the next solo/multi setup works correctly.
+      if (modeSection) modeSection.style.display = '';
+      document.getElementById('menu').classList.add('hidden');
+      document.getElementById('btn-start').onclick = oldStartHandler;
+    }
     document.getElementById('btn-start').onclick = () => {
       if (!chosen) { showToast('PICK A CAPTAIN!'); return; }
       const name = document.getElementById('player-name').value.trim().toUpperCase().slice(0, 14) || chosen.name;
-      document.getElementById('menu').classList.add('hidden');
-      document.getElementById('btn-start').onclick = oldStartHandler;
+      restoreMenu();
       resolve({ avatarId: chosen.id, name });
     };
     document.getElementById('btn-back').onclick = () => {
-      document.getElementById('menu').classList.add('hidden');
-      document.getElementById('btn-start').onclick = oldStartHandler;
+      restoreMenu();
       resolve(null);
     };
   });
@@ -5404,6 +6809,1330 @@ document.getElementById('btn-copy-code').onclick = async () => {
 })();
 
 //=================================================================
+// GAUNTLET CAMPAIGN — flow controller, opponent picker, screen UI.
+// Wraps the existing match loop. Single-player only.
+//=================================================================
+const GAUNTLET = (() => {
+  // Internal state. Separate from base match state so a lost gauntlet
+  // can't corrupt practice/free-play.
+  const G = {
+    active: false,
+    round: 0,                // 0 = not started, 1-5 = current round
+    charId: null,            // selected avatar id
+    charName: 'CAPTAIN',     // entered name
+    opponentLineup: [],      // current round's pirate ids
+    wins: 0,
+    usedOpponents: new Set(),// for variety across runs
+    lastPlayerBluff: false,  // track for Davy tells
+  };
+
+  function reset() {
+    G.active = false; G.round = 0; G.charId = null; G.charName = 'CAPTAIN';
+    G.opponentLineup = []; G.wins = 0;
+    G.usedOpponents = new Set();
+    G.lastPlayerBluff = false;
+    try { SCENE.setGauntletAtmosphere && SCENE.setGauntletAtmosphere(0); } catch(e){}
+    try { resetMatchAudioTier(); } catch(e){}
+  }
+  // === Audio tier — scale rain/wind/music gain per round ===
+  function applyMatchAudioTier(round) {
+    if (!window.AUDIO || !AUDIO.setMatchTier) return;
+    AUDIO.setMatchTier(round);
+  }
+  function resetMatchAudioTier() {
+    if (!window.AUDIO || !AUDIO.setMatchTier) return;
+    AUDIO.setMatchTier(0);
+  }
+
+  // === OPPONENT SELECTION ===
+  // Prefers tier opponents not yet seen this run, recycles within the tier if too
+  // few unique remain, then falls back to any non-davy pirate so we never repeat
+  // an opponent within the same round.
+  function pickRoundOpponents(round) {
+    if (round === 5) return ['davy'];
+    const count = GAUNTLET_OPPONENT_COUNT[round];
+    const tier = GAUNTLET_TIERS[round] || [];
+    // Dedupe tier (overlap is intentional for recycling but the working pool
+    // must not double-count any id).
+    const uniqTier = [...new Set(tier)];
+    let pool = uniqTier.filter(id => !G.usedOpponents.has(id));
+    // Top up with recycled tier members if too few unique-vs-run remain
+    if (pool.length < count) {
+      for (const id of uniqTier) if (!pool.includes(id)) pool.push(id);
+    }
+    // Fall back to ALL non-davy pirates (excluding already-picked-this-round) if STILL short
+    if (pool.length < count) {
+      for (const p of PIRATES) {
+        if (p.id === 'davy') continue;
+        if (!pool.includes(p.id)) pool.push(p.id);
+      }
+    }
+    // Pick `count` unique entries from pool
+    const picks = [];
+    const work = [...pool];
+    for (let i = 0; i < count && work.length > 0; i++) {
+      const idx = Math.floor(Math.random() * work.length);
+      picks.push(work[idx]);
+      work.splice(idx, 1);
+    }
+    picks.forEach(id => G.usedOpponents.add(id));
+    return picks;
+  }
+
+  // === FLOW CONTROL ===
+  function startGauntlet(charId, charName) {
+    reset();
+    G.active = true;
+    G.charId = charId;
+    G.charName = (charName || '').trim().toUpperCase().slice(0,14) || 'CAPTAIN';
+    showBackstory();
+  }
+
+  function getAvatar(id) { return AVATARS.find(a => a.id === id); }
+  function getPirate(id) { return PIRATES.find(p => p.id === id); }
+  function davyPirate() { return PIRATES.find(p => p.id === 'davy'); }
+  // Cutscene → Davy mood mapping (relaxed → uneasy → furious).
+  function davyMoodFor(key) {
+    if (key === 'opening' || key === 'afterR1' || key === 'afterR2') return 'relaxed';
+    if (key === 'afterR3' || key === 'afterR4')                       return 'uneasy';
+    if (key === 'finalIntro' || key === 'gameover')                   return 'furious';
+    if (key === 'victory')                                            return 'uneasy';
+    return 'relaxed';
+  }
+  // Render Davy with a mood-based color filter on top of his base sprite.
+  function drawDavyWithMood(ctx, mood, x, y, displayPx) {
+    const davy = davyPirate();
+    if (!davy) return;
+    drawSpriteAt(ctx, davy.sprite, x, y, displayPx);
+    // Apply mood overlay
+    if (mood === 'uneasy') {
+      // Cool blue-grey shade — nervous, washed out
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = 'rgba(150,170,200,0.55)';
+      ctx.fillRect(x, y, displayPx, displayPx);
+      ctx.restore();
+      // Lower brightness slightly (re-multiply)
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = 'rgba(0,0,20,0.10)';
+      ctx.fillRect(x, y, displayPx, displayPx);
+      ctx.restore();
+    } else if (mood === 'furious') {
+      // Red overlay on the eyes area only — burning rage. Rest of face slightly red-shifted.
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = 'rgba(220,90,80,0.45)';
+      ctx.fillRect(x, y, displayPx, displayPx);
+      ctx.restore();
+      // Eyes glow red — overlay a bright red in the upper-middle band
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const eyeY = y + displayPx * 0.30;
+      const eyeH = displayPx * 0.10;
+      const grad = ctx.createLinearGradient(x, eyeY, x, eyeY + eyeH);
+      grad.addColorStop(0, 'rgba(255,40,30,0)');
+      grad.addColorStop(0.5, 'rgba(255,80,50,0.6)');
+      grad.addColorStop(1, 'rgba(255,40,30,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, eyeY, displayPx, eyeH);
+      ctx.restore();
+    }
+  }
+
+  // === ATMOSPHERIC TIER ===
+  // Per-round ambient color and lighting parameters.
+  // Used by quarters bg, progression bg, and (Phase 3) the match scene tint.
+  function tierFor(round) {
+    const r = Math.max(1, Math.min(5, round || 1));
+    return [null, // 0 unused
+      // R1 — late afternoon, calm, warm lantern light
+      { sky:'#f4d090', skyMid:'#c89060', sea:'#3a6080', wave:'#508098', tint:'rgba(255,180,80,0.0)', lantern:1.0,    rainAlpha:0,    cloud:0.05 },
+      // R2 — dusk, cooler amber, longer shadows
+      { sky:'#a86850', skyMid:'#704830', sea:'#1a3050', wave:'#304a70', tint:'rgba(180,90,60,0.10)', lantern:0.85,   rainAlpha:0.2,  cloud:0.2 },
+      // R3 — twilight, choppy, blue-grey, light rain
+      { sky:'#3a4868', skyMid:'#1a2030', sea:'#0a1830', wave:'#1a2c50', tint:'rgba(80,100,160,0.18)',lantern:0.7,    rainAlpha:0.5,  cloud:0.45 },
+      // R4 — night, storm rolling in, dark blue-purple
+      { sky:'#1a1830', skyMid:'#0a0820', sea:'#080820', wave:'#101830', tint:'rgba(60,40,100,0.30)', lantern:0.55,   rainAlpha:0.8,  cloud:0.7,  lightning:0.05 },
+      // R5 — midnight, full storm, near-black with green-tint lantern, frequent lightning
+      { sky:'#080814', skyMid:'#040408', sea:'#040810', wave:'#0a1018', tint:'rgba(20,40,30,0.45)',  lantern:0.45,   rainAlpha:1.0,  cloud:0.95, lightning:0.18, davyMenace:1.0 },
+    ][r];
+  }
+
+  // === DAVY'S QUARTERS BACKGROUND (procedural pixel art) ===
+  // Dark, gritty captain's quarters in the Dutchman. Smoke wafts through, a
+  // lantern barely lights the scene, sea charts and chests sit in shadow.
+  // Wood is deep brown across all rounds — never bright. Atmosphere darkens
+  // further per round.
+  function drawQuartersBg(canvas, round) {
+    const cx = canvas.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    const W = canvas.width, H = canvas.height;
+    const t = tierFor(round);
+
+    // Base wall — DARK rotted wood, gets even darker each round
+    const wallTone     = round <= 2 ? '#1a0e04' : (round <= 3 ? '#140a02' : '#0a0602');
+    const plankShadow  = round <= 2 ? '#080402' : '#040200';
+    const plankHighlight = round <= 2 ? '#2a1808' : '#1a0e04';
+    cx.fillStyle = wallTone;
+    cx.fillRect(0,0,W,H);
+    // Horizontal plank lines
+    const plankH = Math.max(8, Math.floor(H/12));
+    for (let y = 0; y < H; y += plankH) {
+      cx.fillStyle = plankShadow;
+      cx.fillRect(0, y, W, 1);
+      cx.fillStyle = plankHighlight;
+      cx.fillRect(0, y+1, W, 1);
+      // Wood grain dots
+      for (let x = 0; x < W; x += 22) {
+        if (Math.random() < 0.5) {
+          cx.fillStyle = plankShadow;
+          cx.fillRect(x + ((y*7)%18), y + 3 + ((x*3)%(plankH-4)), 2, 1);
+        }
+      }
+    }
+    // Vertical plank seams (every ~80px)
+    cx.fillStyle = plankShadow;
+    for (let x = 80; x < W; x += 90) cx.fillRect(x, 0, 1, H);
+
+    // Porthole on right side — circular window showing weather
+    const pX = W - 110, pY = 100, pR = 60;
+    // Porthole frame (brass)
+    cx.fillStyle = '#604030';
+    drawCircle(cx, pX, pY, pR+6);
+    cx.fillStyle = '#a07028';
+    drawCircle(cx, pX, pY, pR+3);
+    cx.fillStyle = '#604030';
+    drawCircle(cx, pX, pY, pR);
+    // Porthole inner — sky + sea
+    cx.save();
+    cx.beginPath();
+    cx.arc(pX, pY, pR-2, 0, Math.PI*2);
+    cx.clip();
+    // Sky
+    const grad = cx.createLinearGradient(0, pY-pR, 0, pY+pR);
+    grad.addColorStop(0, t.sky);
+    grad.addColorStop(0.6, t.skyMid);
+    grad.addColorStop(1, t.sea);
+    cx.fillStyle = grad;
+    cx.fillRect(pX-pR, pY-pR, pR*2, pR*2);
+    // Horizon line + waves
+    const horizonY = pY + pR*0.4;
+    cx.fillStyle = t.sea;
+    cx.fillRect(pX-pR, horizonY, pR*2, pR);
+    // Wave caps
+    cx.fillStyle = t.wave;
+    for (let wy = 0; wy < pR*0.6; wy += 4) {
+      for (let wx = -pR; wx < pR; wx += 6) {
+        const phase = Math.sin((wx+wy)*0.4) > 0;
+        if (phase) cx.fillRect(pX+wx, horizonY+wy+(wx%3), 4, 1);
+      }
+    }
+    // Rain streaks
+    if (t.rainAlpha > 0.3) {
+      cx.fillStyle = `rgba(180,200,220,${t.rainAlpha*0.6})`;
+      for (let i = 0; i < 30*t.rainAlpha; i++) {
+        const rx = pX-pR + Math.random()*pR*2;
+        const ry = pY-pR + Math.random()*pR*2;
+        cx.fillRect(rx|0, ry|0, 1, 4);
+      }
+    }
+    // Distant lightning bolt (R4-R5)
+    if (t.lightning && Math.random() < 0.6) {
+      cx.fillStyle = 'rgba(220,230,255,0.8)';
+      let bx = pX + (Math.random()-0.3)*pR;
+      let by = pY - pR*0.7;
+      while (by < horizonY) {
+        cx.fillRect(bx, by, 2, 5);
+        bx += (Math.random()-0.5)*8;
+        by += 5;
+      }
+    }
+    // Cloud band
+    if (t.cloud > 0.3) {
+      cx.fillStyle = `rgba(40,40,60,${t.cloud*0.6})`;
+      for (let i = 0; i < 4; i++) {
+        const cWx = pX-pR + Math.random()*pR*2;
+        const cWy = pY-pR*0.7 + Math.random()*pR*0.4;
+        cx.fillRect(cWx, cWy, 22+Math.random()*18, 4);
+      }
+    }
+    cx.restore();
+    // Porthole rivets
+    cx.fillStyle = '#806840';
+    for (let a = 0; a < Math.PI*2; a += Math.PI/4) {
+      const rx = pX + Math.cos(a)*(pR+3);
+      const ry = pY + Math.sin(a)*(pR+3);
+      cx.fillRect(rx-1, ry-1, 3, 3);
+    }
+    // Glass reflection
+    cx.fillStyle = 'rgba(255,255,255,0.12)';
+    cx.fillRect(pX-pR/2, pY-pR/2, pR/3, pR/3);
+
+    // Hanging lantern (centered above-ish) — lower glow, more menacing
+    const lX = W/2, lY = 60;
+    // Chain (rusted)
+    cx.fillStyle = '#1a1208';
+    for (let i = 0; i < 50; i += 4) {
+      cx.fillRect(lX-1, i, 2, 2);
+    }
+    // Lantern body — rusted brass
+    cx.fillStyle = '#2a1808';
+    cx.fillRect(lX-12, lY, 24, 4);    // top cap
+    cx.fillStyle = '#604030';
+    cx.fillRect(lX-10, lY+4, 20, 26); // body cage (darker tone)
+    // Glass panes — dimmer glow
+    const lanternBrightness = 0.45 * t.lantern;  // halved from 0.7
+    cx.fillStyle = `rgba(255,160,60,${lanternBrightness})`;
+    cx.fillRect(lX-8, lY+6, 16, 22);
+    // Cage bars (vertical)
+    cx.fillStyle = '#1a1208';
+    for (let bx = lX-8; bx <= lX+8; bx += 4) cx.fillRect(bx, lY+4, 1, 26);
+    // Bottom cap (rusted)
+    cx.fillStyle = '#2a1808';
+    cx.fillRect(lX-12, lY+30, 24, 4);
+    // Glow halo — dimmer
+    const haloR = 50 * t.lantern;
+    const haloG = cx.createRadialGradient(lX, lY+18, 0, lX, lY+18, haloR);
+    haloG.addColorStop(0, `rgba(255,160,60,${0.22*t.lantern})`);
+    haloG.addColorStop(1, 'rgba(255,160,60,0)');
+    cx.fillStyle = haloG;
+    cx.fillRect(lX-haloR, lY-haloR, haloR*2, haloR*2);
+
+    // SMOKE wafting through the room — multiple layered drift bands
+    // Use round number to seed deterministic smoke positions per round.
+    const smokeAlpha = 0.18 + round*0.04;
+    cx.fillStyle = `rgba(180,180,170,${smokeAlpha})`;
+    for (let i = 0; i < 8; i++) {
+      const sWx = ((i*157 + round*39) % W);
+      const sWy = ((i*89 + 30 + round*47) % (H-50));
+      const sLen = 90 + (i*17)%70;
+      cx.fillRect(sWx, sWy, sLen, 4);
+    }
+    cx.fillStyle = `rgba(150,150,140,${smokeAlpha*0.85})`;
+    for (let i = 0; i < 6; i++) {
+      const sWx = ((i*191 + round*53) % W);
+      const sWy = ((i*73 + 60 + round*61) % (H-30));
+      const sLen = 70 + (i*23)%50;
+      cx.fillRect(sWx, sWy, sLen, 3);
+      cx.fillRect(sWx+8, sWy-2, sLen-16, 2);
+    }
+    // Lantern smoke trail (rising from the lantern)
+    cx.fillStyle = `rgba(160,150,140,${smokeAlpha})`;
+    for (let i = 0; i < 4; i++) {
+      const offset = i*3;
+      cx.fillRect(lX-3+offset, lY-30+i*8, 8, 3);
+      cx.fillRect(lX+offset, lY-50+i*10, 6, 2);
+    }
+
+    // Sea chart on left wall
+    const cX = 40, cY = 100;
+    cx.fillStyle = '#605838';
+    cx.fillRect(cX, cY, 100, 70);  // parchment shadow
+    cx.fillStyle = '#a89868';
+    cx.fillRect(cX-2, cY-2, 100, 70);  // parchment
+    // Coastline sketch (darker squiggle)
+    cx.fillStyle = '#604838';
+    for (let i = 0; i < 14; i++) {
+      const dx = i*7, dy = 20 + Math.sin(i*0.8)*8;
+      cx.fillRect(cX-2+dx, cY-2+dy, 4, 2);
+    }
+    // Compass rose
+    cx.fillStyle = '#604838';
+    cx.fillRect(cX+74, cY+44, 12, 1);
+    cx.fillRect(cX+79, cY+39, 1, 12);
+    // Dotted route line
+    for (let i = 0; i < 10; i++) {
+      cx.fillStyle = '#c83020';
+      cx.fillRect(cX+10+i*8, cY+50-i*2, 2, 2);
+    }
+    // X marks the spot
+    cx.fillStyle = '#c83020';
+    cx.fillRect(cX+82, cY+30, 4, 4);
+    cx.fillRect(cX+86, cY+34, 4, 4);
+    cx.fillRect(cX+86, cY+30, -4, 4);
+    cx.fillRect(cX+82, cY+34, 4, -4);
+    // Pin
+    cx.fillStyle = '#a01818';
+    cx.fillRect(cX-2, cY-2, 3, 3);
+    cx.fillRect(cX+97, cY-2, 3, 3);
+    cx.fillRect(cX-2, cY+66, 3, 3);
+    cx.fillRect(cX+97, cY+66, 3, 3);
+
+    // Treasure chest in lower-left corner
+    const tX = 30, tY = H - 60;
+    cx.fillStyle = '#1a0a04';  // shadow
+    cx.fillRect(tX-2, tY+2, 90, 50);
+    cx.fillStyle = '#604030';  // chest body
+    cx.fillRect(tX, tY, 86, 46);
+    cx.fillStyle = '#403020';  // bottom shadow
+    cx.fillRect(tX, tY+38, 86, 8);
+    cx.fillStyle = '#a07028';  // band
+    cx.fillRect(tX, tY+8, 86, 4);
+    cx.fillRect(tX, tY+22, 86, 4);
+    cx.fillRect(tX, tY+34, 86, 4);
+    // Lock
+    cx.fillStyle = '#403020';
+    cx.fillRect(tX+38, tY+18, 10, 12);
+    cx.fillStyle = '#f0d040';
+    cx.fillRect(tX+40, tY+20, 6, 8);
+    // Highlights
+    cx.fillStyle = '#806840';
+    cx.fillRect(tX, tY, 86, 1);
+    cx.fillRect(tX, tY, 1, 46);
+    // Coins peeking out
+    cx.fillStyle = '#f0d040';
+    cx.fillRect(tX+20, tY-3, 4, 3);
+    cx.fillRect(tX+62, tY-3, 4, 3);
+    cx.fillStyle = '#a07028';
+    cx.fillRect(tX+30, tY-2, 3, 2);
+
+    // Atmospheric tint overlay (color-cast for the round's mood)
+    if (t.tint && t.tint !== 'rgba(255,180,80,0.0)') {
+      cx.fillStyle = t.tint;
+      cx.fillRect(0,0,W,H);
+    }
+
+    // R5: ghost-green vignette + faint kraken tentacle silhouette through porthole
+    if (round === 5) {
+      // Vignette
+      const vg = cx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.8);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,0,0.7)');
+      cx.fillStyle = vg;
+      cx.fillRect(0,0,W,H);
+      // Subtle green tint on lantern halo
+      cx.fillStyle = 'rgba(40,180,80,0.06)';
+      cx.fillRect(0,0,W,H);
+    }
+  }
+
+  function drawCircle(cx, x, y, r) {
+    cx.beginPath();
+    cx.arc(x, y, r, 0, Math.PI*2);
+    cx.fill();
+  }
+
+  // === VICTORY BACKGROUND — sunlit tropical beach ===
+  // Sky gradient → distant Dutchman silhouette receding → tropical sea →
+  // beach sand → palm tree fronds framing the sides. Warm golden hour.
+  function drawVictoryBg(canvas) {
+    const cx = canvas.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    const W = canvas.width, H = canvas.height;
+    // Sky gradient — golden hour
+    const skyG = cx.createLinearGradient(0, 0, 0, H*0.65);
+    skyG.addColorStop(0, '#80c8e8');
+    skyG.addColorStop(0.5, '#f8d878');
+    skyG.addColorStop(1, '#f4a060');
+    cx.fillStyle = skyG;
+    cx.fillRect(0, 0, W, H*0.65);
+    // Sun (large, low)
+    const sunX = W*0.7, sunY = H*0.35, sunR = 50;
+    const sunG = cx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR*2);
+    sunG.addColorStop(0, '#ffffd0');
+    sunG.addColorStop(0.4, 'rgba(255,240,180,0.8)');
+    sunG.addColorStop(1, 'rgba(255,200,120,0)');
+    cx.fillStyle = sunG;
+    cx.fillRect(sunX-sunR*2, sunY-sunR*2, sunR*4, sunR*4);
+    cx.fillStyle = '#fff8c0';
+    cx.beginPath(); cx.arc(sunX, sunY, sunR, 0, Math.PI*2); cx.fill();
+    // Distant clouds (drifting)
+    cx.fillStyle = 'rgba(255,240,200,0.7)';
+    for (let i = 0; i < 6; i++) {
+      const cWx = (i*180 + 50) % W;
+      const cWy = 50 + (i*30)%80;
+      cx.fillRect(cWx, cWy, 70, 8);
+      cx.fillRect(cWx+8, cWy-4, 50, 8);
+    }
+    // Distant Dutchman silhouette receding — sailing into the horizon
+    const sX = W*0.18, sY = H*0.55;
+    cx.fillStyle = '#1a1828';
+    // Hull
+    cx.fillRect(sX-18, sY, 36, 5);
+    cx.fillRect(sX-15, sY+5, 30, 2);
+    // Mast
+    cx.fillRect(sX-1, sY-22, 2, 22);
+    // Sails (dark, tattered)
+    cx.fillRect(sX-9, sY-22, 18, 12);
+    cx.fillRect(sX-13, sY-15, 6, 8);
+    cx.fillRect(sX+7, sY-15, 6, 8);
+    // Subtle storm cloud band over the Dutchman (storm dissipating)
+    cx.fillStyle = 'rgba(60,50,80,0.35)';
+    cx.fillRect(sX-50, sY-50, 100, 14);
+    cx.fillStyle = 'rgba(80,70,100,0.20)';
+    cx.fillRect(sX-60, sY-44, 120, 8);
+    // Sea — turquoise tropical
+    const seaY = H*0.65;
+    cx.fillStyle = '#3aa0c0';
+    cx.fillRect(0, seaY, W, H*0.18);
+    // Wave caps
+    cx.fillStyle = '#80d0e0';
+    for (let band = 0; band < 6; band++) {
+      const y = seaY + band*5;
+      for (let x = 0; x < W; x += 6) {
+        const phase = Math.sin(x*0.04 + band*0.6) > 0;
+        if (phase) cx.fillRect(x, y, 4, 1);
+      }
+    }
+    // Sun reflection on water
+    cx.fillStyle = 'rgba(255,240,180,0.5)';
+    cx.fillRect(sunX-30, seaY, 60, H*0.05);
+    cx.fillStyle = 'rgba(255,255,200,0.3)';
+    for (let i = 0; i < 8; i++) {
+      cx.fillRect(sunX-30+i*7, seaY+i*4, 60-i*8, 1);
+    }
+    // Beach sand
+    const sandY = H*0.83;
+    const sandG = cx.createLinearGradient(0, sandY, 0, H);
+    sandG.addColorStop(0, '#e8c878');
+    sandG.addColorStop(1, '#c8a058');
+    cx.fillStyle = sandG;
+    cx.fillRect(0, sandY, W, H*0.17);
+    // Sand details (texture dots)
+    cx.fillStyle = '#a07840';
+    for (let i = 0; i < 60; i++) {
+      cx.fillRect((i*53)%W, sandY + (i*37)%(H*0.17), 1, 1);
+    }
+    // Footprints leading from shoreline
+    cx.fillStyle = '#604030';
+    for (let i = 0; i < 6; i++) {
+      const fx = W*0.4 + i*20;
+      const fy = sandY + 30 - i*8;
+      cx.fillRect(fx, fy, 6, 3);
+      cx.fillRect(fx+2, fy+5, 6, 3);
+    }
+    // Palm tree silhouette on left
+    const ptX = 60, ptY = H*0.85;
+    cx.fillStyle = '#3a2410';
+    cx.fillRect(ptX-3, ptY-180, 5, 180);
+    // Curve in trunk
+    cx.fillRect(ptX-2, ptY-180, 1, 40);
+    cx.fillRect(ptX+2, ptY-140, 1, 40);
+    // Fronds (drooping leaf shapes)
+    cx.fillStyle = '#2a6020';
+    // Top fronds
+    cx.fillRect(ptX-30, ptY-200, 60, 4);
+    cx.fillRect(ptX-50, ptY-195, 30, 4);
+    cx.fillRect(ptX+20, ptY-195, 35, 4);
+    cx.fillRect(ptX-45, ptY-185, 25, 4);
+    cx.fillRect(ptX+25, ptY-185, 30, 4);
+    cx.fillRect(ptX-35, ptY-175, 18, 4);
+    cx.fillRect(ptX+18, ptY-175, 22, 4);
+    // Frond highlights
+    cx.fillStyle = '#508028';
+    cx.fillRect(ptX-30, ptY-200, 60, 1);
+    cx.fillRect(ptX-50, ptY-195, 30, 1);
+    cx.fillRect(ptX+20, ptY-195, 35, 1);
+    // Coconuts
+    cx.fillStyle = '#4a2810';
+    cx.fillRect(ptX-3, ptY-180, 4, 4);
+    cx.fillRect(ptX+3, ptY-178, 4, 4);
+    // Palm tree silhouette on right (smaller, further)
+    const ptX2 = W - 80, ptY2 = H*0.86;
+    cx.fillStyle = '#3a2410';
+    cx.fillRect(ptX2-2, ptY2-140, 4, 140);
+    cx.fillStyle = '#2a6020';
+    cx.fillRect(ptX2-25, ptY2-155, 50, 4);
+    cx.fillRect(ptX2-35, ptY2-148, 25, 4);
+    cx.fillRect(ptX2+10, ptY2-148, 30, 4);
+    cx.fillRect(ptX2-30, ptY2-140, 18, 4);
+    cx.fillRect(ptX2+15, ptY2-140, 20, 4);
+    cx.fillStyle = '#508028';
+    cx.fillRect(ptX2-25, ptY2-155, 50, 1);
+    // Soft warm vignette
+    const vg = cx.createRadialGradient(W/2, H/2, H*0.4, W/2, H/2, H);
+    vg.addColorStop(0, 'rgba(255,220,140,0)');
+    vg.addColorStop(1, 'rgba(180,80,40,0.4)');
+    cx.fillStyle = vg;
+    cx.fillRect(0, 0, W, H);
+    // Distant seagulls
+    cx.fillStyle = '#1a0a04';
+    for (let i = 0; i < 5; i++) {
+      const gx = 200 + i*120;
+      const gy = 100 + (i*30)%80;
+      cx.fillRect(gx, gy, 2, 1);
+      cx.fillRect(gx-1, gy+1, 4, 1);
+      cx.fillRect(gx+5, gy, 2, 1);
+      cx.fillRect(gx+4, gy+1, 4, 1);
+    }
+  }
+
+  // --- Soul backstory card ---
+  function showBackstory() {
+    const av = getAvatar(G.charId);
+    const cv = document.getElementById('gnt-back-portrait');
+    cv.width = 64; cv.height = 64;
+    const cx = cv.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    cx.clearRect(0,0,64,64);
+    if (av) drawSpriteAt(cx, av.sprite, 0, 0, 64);
+    document.getElementById('gnt-back-name').textContent = G.charName;
+    document.getElementById('gnt-back-line').textContent =
+      SOUL_BACKSTORIES[G.charId] || 'Lost a wager with the sea itself.';
+    show('gnt-backstory');
+    AUDIO.init();
+    try { AUDIO.oceanSwell && AUDIO.oceanSwell(); } catch(e){}
+    // Faint distant thunder follows after the swell
+    setTimeout(() => { try { AUDIO.thunder && AUDIO.thunder(); } catch(e){} }, 1400);
+    let advanced = false;
+    const advance = () => {
+      if (advanced) return; advanced = true;
+      hide('gnt-backstory');
+      showCutscene('opening', () => showProgressionScreen());
+    };
+    document.getElementById('gnt-backstory').onclick = advance;
+    setTimeout(advance, 5000);
+  }
+
+  // Map a cutscene key to the atmospheric round it should reflect.
+  function cutsceneRound(key) {
+    if (key === 'opening') return 1;
+    if (key === 'afterR1') return 1;   // just won R1, atmosphere transitioning to R2
+    if (key === 'afterR2') return 2;
+    if (key === 'afterR3') return 3;
+    if (key === 'afterR4') return 4;
+    if (key === 'finalIntro') return 5;
+    if (key === 'victory') return 1;   // calming
+    if (key === 'gameover') return 5;  // full storm
+    return G.round || 1;
+  }
+
+  // --- Cutscene with typewriter dialogue ---
+  function showCutscene(key, onDone) {
+    const lines = (GAUNTLET_CUTSCENES[key] || []).slice();
+    const charAvatar = getAvatar(G.charId);
+    const davy = davyPirate();
+    // Paint Davy's quarters bg with the round-appropriate atmosphere
+    const bg = document.getElementById('gnt-cutscene-bg');
+    bg.width = window.innerWidth; bg.height = window.innerHeight;
+    drawQuartersBg(bg, cutsceneRound(key));
+    // Render Davy portrait with mood for this cutscene (relaxed/uneasy/furious)
+    const mood = davyMoodFor(key);
+    const dCv = document.getElementById('gnt-cut-davy');
+    dCv.width = 64; dCv.height = 64;
+    const dCtx = dCv.getContext('2d');
+    dCtx.imageSmoothingEnabled = false;
+    dCtx.clearRect(0,0,64,64);
+    drawDavyWithMood(dCtx, mood, 0, 0, 64);
+    // Update Davy's name color to reflect menace level (read again below)
+    document.getElementById('gnt-dialogue-speaker').dataset.mood = mood;
+    const pCv = document.getElementById('gnt-cut-player');
+    pCv.width = 64; pCv.height = 64;
+    pCv.getContext('2d').clearRect(0,0,64,64);
+    if (charAvatar) drawSpriteAt(pCv.getContext('2d'), charAvatar.sprite, 0, 0, 64);
+    document.getElementById('gnt-cut-pname').textContent = G.charName;
+    show('gnt-cutscene');
+
+    // Iterate dialogue with typewriter effect.
+    let lineIdx = 0;
+    let charIdx = 0;
+    let typing = false;
+    let fullLine = '';
+    const speakerEl = document.getElementById('gnt-dialogue-speaker');
+    const textEl = document.getElementById('gnt-dialogue-text');
+    const subst = (t) => (t || '').replace(/\{char\}/g, G.charName);
+    function nextLine() {
+      if (lineIdx >= lines.length) { hide('gnt-cutscene'); onDone && onDone(); return; }
+      const l = lines[lineIdx];
+      speakerEl.textContent = l.who === 'davy' ? 'DAVY JONES' : G.charName;
+      speakerEl.style.color = l.who === 'davy' ? '#f48030' : '#80c0d0';
+      fullLine = subst(l.text);
+      charIdx = 0;
+      typing = true;
+      textEl.textContent = '';
+      typeStep();
+    }
+    function typeStep() {
+      if (!typing) return;
+      if (charIdx >= fullLine.length) { typing = false; return; }
+      textEl.textContent = fullLine.slice(0, ++charIdx);
+      try { if (charIdx % 2 === 0 && AUDIO.typewriter) AUDIO.typewriter(); } catch(e){}
+      setTimeout(typeStep, 28);
+    }
+    function clickAdvance() {
+      if (typing) {
+        // Skip to end of line
+        textEl.textContent = fullLine;
+        typing = false;
+        charIdx = fullLine.length;
+        return;
+      }
+      lineIdx++;
+      nextLine();
+    }
+    document.getElementById('gnt-cutscene').onclick = clickAdvance;
+    nextLine();
+  }
+
+  // === PROGRESSION-SCREEN BACKGROUND ===
+  // Davy Jones's locker — the player is trapped underwater inside the sunken realm.
+  // Dark, gritty, oppressive. Escalates from "barely-lit murk" (R1) to "violent
+  // green-black abyss" (R5). Every round dark; never peaceful.
+  function drawProgressionBg(canvas, round) {
+    const cx = canvas.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    const W = canvas.width, H = canvas.height;
+    // Locker palette — desaturated cold blacks with hints of bottle-green murk
+    const tiers = [null,
+      { topMurk: '#0a141a', botMurk: '#040608', accent: '#1a3028', krakenAlpha: 0.35, rays: 0.20, mistAlpha: 0.10, chainsAlpha: 0.55, lightning: 0    },  // R1
+      { topMurk: '#08121a', botMurk: '#040608', accent: '#1a3424', krakenAlpha: 0.45, rays: 0.16, mistAlpha: 0.14, chainsAlpha: 0.65, lightning: 0    },  // R2
+      { topMurk: '#040c14', botMurk: '#020406', accent: '#0f2820', krakenAlpha: 0.55, rays: 0.10, mistAlpha: 0.20, chainsAlpha: 0.75, lightning: 0.04 },  // R3
+      { topMurk: '#020610', botMurk: '#000204', accent: '#103024', krakenAlpha: 0.7,  rays: 0.06, mistAlpha: 0.28, chainsAlpha: 0.85, lightning: 0.10 },  // R4
+      { topMurk: '#000204', botMurk: '#000000', accent: '#1a4030', krakenAlpha: 0.85, rays: 0.04, mistAlpha: 0.40, chainsAlpha: 0.95, lightning: 0.20 },  // R5
+    ];
+    const t = tiers[Math.max(1, Math.min(5, round))];
+    // Base murk gradient
+    const grad = cx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, t.topMurk);
+    grad.addColorStop(0.55, t.topMurk);
+    grad.addColorStop(1, t.botMurk);
+    cx.fillStyle = grad;
+    cx.fillRect(0, 0, W, H);
+    // Faint downward god-rays (filtered light through the murk) — get weaker each round
+    if (t.rays > 0) {
+      for (let i = 0; i < 4; i++) {
+        const rx = (W*0.18) + i*(W*0.21);
+        const rg = cx.createLinearGradient(rx, 0, rx, H*0.85);
+        rg.addColorStop(0, `rgba(180,200,180,${t.rays})`);
+        rg.addColorStop(1, 'rgba(180,200,180,0)');
+        cx.fillStyle = rg;
+        const tilt = (i%2 === 0 ? 1 : -1) * 30;
+        cx.beginPath();
+        cx.moveTo(rx-40, 0); cx.lineTo(rx+40, 0);
+        cx.lineTo(rx+tilt+80, H*0.85); cx.lineTo(rx+tilt-80, H*0.85);
+        cx.closePath(); cx.fill();
+      }
+    }
+    // Drifting silt/sediment specks (atmosphere depth)
+    cx.fillStyle = `rgba(160,170,140,${0.18 - round*0.025})`;
+    for (let i = 0; i < 40; i++) {
+      const dx = (i*113)%W;
+      const dy = (i*71 + (round*17))%H;
+      cx.fillRect(dx, dy, 1, 1);
+      if (i%3 === 0) cx.fillRect(dx+1, dy, 1, 1);
+    }
+    // Bottle-green murk haze bands
+    cx.fillStyle = t.accent;
+    for (let i = 0; i < 5; i++) {
+      const y = (i*H/5) + (i*7)%30;
+      cx.fillRect(0, y, W, 1);
+    }
+    // KRAKEN TENTACLE silhouettes — looming from sides, more visible each round
+    if (t.krakenAlpha > 0) {
+      cx.fillStyle = `rgba(8,16,12,${t.krakenAlpha})`;
+      // Left tentacle
+      const lTx = -10; const lTy = H*0.2;
+      for (let s = 0; s < 30; s++) {
+        const sw = 24 - s*0.6;
+        const sx = lTx + s*4 + Math.sin(s*0.4)*8;
+        const sy = lTy + s*8 + Math.sin(s*0.3)*3;
+        cx.fillRect(sx, sy, sw, 8);
+      }
+      // Sucker dots on left tentacle
+      cx.fillStyle = `rgba(20,40,32,${t.krakenAlpha})`;
+      for (let s = 4; s < 28; s += 3) {
+        const sx = -10 + s*4 + Math.sin(s*0.4)*8 + 4;
+        const sy = H*0.2 + s*8 + Math.sin(s*0.3)*3 + 2;
+        cx.fillRect(sx, sy, 3, 3);
+      }
+      // Right tentacle (smaller, further back)
+      cx.fillStyle = `rgba(6,14,10,${t.krakenAlpha*0.85})`;
+      const rTx = W; const rTy = H*0.4;
+      for (let s = 0; s < 25; s++) {
+        const sw = 18 - s*0.5;
+        const sx = rTx - s*5 + Math.sin(s*0.5)*6;
+        const sy = rTy + s*7 + Math.cos(s*0.3)*4;
+        cx.fillRect(sx, sy, sw, 7);
+      }
+    }
+    // Hanging chains drifting in the current — the locker's prison detail
+    cx.fillStyle = `rgba(20,18,14,${t.chainsAlpha})`;
+    for (let i = 0; i < 5; i++) {
+      const cx0 = (W*0.12) + i*(W*0.20);
+      const len = 80 + (i*40)%120;
+      for (let y = 0; y < len; y += 6) {
+        const swayX = cx0 + Math.sin(y*0.08 + i)*5;
+        cx.fillRect(swayX, y, 3, 4);
+      }
+    }
+    // Highlight specks on chain links
+    cx.fillStyle = `rgba(80,70,50,${t.chainsAlpha*0.4})`;
+    for (let i = 0; i < 5; i++) {
+      const cx0 = (W*0.12) + i*(W*0.20);
+      const len = 80 + (i*40)%120;
+      for (let y = 0; y < len; y += 6) {
+        const swayX = cx0 + Math.sin(y*0.08 + i)*5;
+        cx.fillRect(swayX+1, y, 1, 1);
+      }
+    }
+    // Sunken Dutchman silhouette — skeletal, half-broken, on the seabed
+    const sX = W*0.7, sY = H*0.78;
+    cx.fillStyle = '#04080a';
+    cx.fillRect(sX-40, sY, 80, 12);              // broken hull
+    cx.fillRect(sX-50, sY+12, 100, 4);            // half-buried base
+    cx.fillRect(sX-2, sY-44, 4, 44);              // mast (tilted)
+    cx.fillRect(sX-22, sY-44, 44, 16);            // tattered main sail
+    cx.fillRect(sX-30, sY-32, 12, 12);            // foresail tatters
+    cx.fillRect(sX+18, sY-32, 12, 12);            // mizzen tatters
+    // Hull holes / damage
+    cx.fillStyle = t.botMurk;
+    cx.fillRect(sX-20, sY+3, 6, 5);
+    cx.fillRect(sX+8, sY+5, 8, 4);
+    // Drifting mist / smoke pockets
+    cx.fillStyle = `rgba(180,200,170,${t.mistAlpha})`;
+    for (let i = 0; i < 6; i++) {
+      const mWx = (i*157)%W;
+      const mWy = (i*89 + 40)%H;
+      cx.fillRect(mWx, mWy, 80+(i*23)%50, 6);
+      cx.fillRect(mWx+10, mWy-2, 60, 4);
+    }
+    // Lightning rare flicker in the deepest rounds (filtered through murk)
+    if (t.lightning && Math.random() < t.lightning*5) {
+      cx.fillStyle = `rgba(140,180,200,${0.6})`;
+      cx.fillRect(0, 0, W, H);
+    }
+    // Heavy radial vignette — closes in around the player like the locker squeezing
+    const vg = cx.createRadialGradient(W/2, H/2, H*0.18, W/2, H/2, H*0.95);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, `rgba(0,0,0,${0.65 + round*0.05})`);
+    cx.fillStyle = vg;
+    cx.fillRect(0, 0, W, H);
+    // R5: ghost-green pulse on top
+    if (round === 5) {
+      cx.fillStyle = 'rgba(20,60,40,0.18)';
+      cx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // === NODE PIXEL-ART ICONS ===
+  function drawNodeIcon(canvas, kind) {
+    const cx = canvas.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    cx.clearRect(0, 0, canvas.width, canvas.height);
+    const S = canvas.width;
+    const px = (x,y,w,h,c) => { cx.fillStyle = c; cx.fillRect(x,y,w,h); };
+    if (kind === 'completed') {
+      // Treasure coin with star
+      const cx0 = S/2, cy0 = S/2, R = S*0.42;
+      cx.fillStyle = '#a07028';
+      cx.beginPath(); cx.arc(cx0, cy0, R+1, 0, Math.PI*2); cx.fill();
+      cx.fillStyle = '#f0d040';
+      cx.beginPath(); cx.arc(cx0, cy0, R-1, 0, Math.PI*2); cx.fill();
+      cx.fillStyle = '#fff8c0';
+      cx.beginPath(); cx.arc(cx0-R/3, cy0-R/3, R/4, 0, Math.PI*2); cx.fill();
+      // Star center
+      cx.fillStyle = '#604030';
+      const sx = cx0, sy = cy0;
+      cx.fillRect(sx-1, sy-S/4, 2, S/2);
+      cx.fillRect(sx-S/4, sy-1, S/2, 2);
+    } else if (kind === 'current') {
+      // Glowing anchor
+      const cx0 = S/2;
+      // Halo
+      const grad = cx.createRadialGradient(cx0, S/2, 0, cx0, S/2, S/2);
+      grad.addColorStop(0, 'rgba(255,140,40,0.6)');
+      grad.addColorStop(1, 'rgba(255,140,40,0)');
+      cx.fillStyle = grad;
+      cx.fillRect(0, 0, S, S);
+      // Anchor (orange)
+      cx.fillStyle = '#f48030';
+      // Ring at top
+      cx.fillRect(cx0-3, 6, 6, 2);
+      cx.fillRect(cx0-2, 4, 4, 2);
+      cx.fillRect(cx0-3, 8, 1, 1); cx.fillRect(cx0+2, 8, 1, 1);
+      // Shaft
+      cx.fillRect(cx0-1, 10, 2, S-22);
+      // Crossbar
+      cx.fillRect(cx0-S/4, S*0.45, S/2, 2);
+      // Curved bottom (flukes)
+      cx.fillRect(cx0-S/3, S-14, 2, 6);
+      cx.fillRect(cx0+S/3-2, S-14, 2, 6);
+      cx.fillRect(cx0-S/3+2, S-9, S/2-S/3+2-2, 2);
+      cx.fillRect(cx0+S/3-S/2+2, S-9, S/3-2, 2);
+      cx.fillRect(cx0-S/3-2, S-14, 4, 2);
+      cx.fillRect(cx0+S/3-2, S-14, 4, 2);
+    } else if (kind === 'boss') {
+      // Skull
+      cx.fillStyle = '#c83020';
+      const cx0 = S/2;
+      // Skull dome
+      cx.fillRect(cx0-S/3, S/4, S*2/3, S/3);
+      cx.fillRect(cx0-S/3+1, S/4-2, S*2/3-2, 2);
+      // Eye sockets
+      cx.fillStyle = '#0a0604';
+      cx.fillRect(cx0-S/4+1, S*0.34, S/8, S/8);
+      cx.fillRect(cx0+S/4-1-S/8, S*0.34, S/8, S/8);
+      // Jaw
+      cx.fillStyle = '#c83020';
+      cx.fillRect(cx0-S/4, S*0.55, S/2, S/8);
+      // Teeth
+      cx.fillStyle = '#0a0604';
+      for (let i = 0; i < 4; i++) {
+        cx.fillRect(cx0-S/4+i*(S/8), S*0.55, 1, S/8);
+      }
+      // Crossbones
+      cx.strokeStyle = '#c83020';
+      cx.lineWidth = 2;
+      cx.beginPath();
+      cx.moveTo(cx0-S/3-2, S*0.7); cx.lineTo(cx0+S/3+2, S*0.95);
+      cx.moveTo(cx0+S/3+2, S*0.7); cx.lineTo(cx0-S/3-2, S*0.95);
+      cx.stroke();
+    } else {
+      // Upcoming — locked chest silhouette
+      cx.fillStyle = '#3a2410';
+      cx.fillRect(S*0.2, S*0.45, S*0.6, S*0.4);
+      cx.fillRect(S*0.2, S*0.35, S*0.6, S*0.15);
+      cx.fillStyle = '#2a1808';
+      cx.fillRect(S*0.45, S*0.5, S*0.1, S*0.15);
+    }
+  }
+
+  // === ROPE CONNECTOR ===
+  // Render the connecting rope between nodes as a separate canvas overlay.
+  function drawRopeConnectors(container, nodes) {
+    // Remove any old rope
+    const old = container.querySelector('.gnt-rope-canvas');
+    if (old) old.remove();
+    if (nodes.length < 2) return;
+    const cv = document.createElement('canvas');
+    cv.className = 'gnt-rope-canvas';
+    const rect = container.getBoundingClientRect();
+    cv.width = rect.width;
+    cv.height = rect.height;
+    cv.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0;';
+    const cx = cv.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    // Get center y of each node
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const a = nodes[i].getBoundingClientRect();
+      const b = nodes[i+1].getBoundingClientRect();
+      const x1 = a.right - rect.left;
+      const y1 = a.top + a.height/2 - rect.top;
+      const x2 = b.left - rect.left;
+      const y2 = b.top + b.height/2 - rect.top;
+      // Rope: tan with darker shadow stripe
+      cx.fillStyle = '#604030';
+      const len = Math.abs(x2-x1);
+      for (let t = 0; t <= len; t += 4) {
+        const xm = x1 + t;
+        const ym = y1 + (y2-y1) * (t/len);
+        cx.fillRect(xm, ym-2, 3, 1);     // shadow
+        cx.fillStyle = '#a07840';
+        cx.fillRect(xm, ym-1, 3, 1);     // mid
+        cx.fillStyle = '#c89860';
+        cx.fillRect(xm, ym, 3, 1);       // highlight
+        cx.fillStyle = '#604030';
+        cx.fillRect(xm, ym+1, 3, 1);     // shadow back
+      }
+    }
+    container.style.position = 'relative';
+    container.insertBefore(cv, container.firstChild);
+  }
+
+  // --- Progression screen ---
+  function showProgressionScreen() {
+    const sub = document.getElementById('gnt-prog-sub');
+    const targetRound = G.round + 1;
+    sub.textContent = `ROUND ${targetRound} OF 5`;
+    // Atmospheric bg
+    const bg = document.getElementById('gnt-prog-bg');
+    bg.width = window.innerWidth; bg.height = window.innerHeight;
+    drawProgressionBg(bg, targetRound);
+    // Char portrait
+    const av = getAvatar(G.charId);
+    const cv = document.getElementById('gnt-prog-char-portrait');
+    cv.width = 48; cv.height = 48;
+    cv.getContext('2d').imageSmoothingEnabled = false;
+    cv.getContext('2d').clearRect(0,0,48,48);
+    if (av) drawSpriteAt(cv.getContext('2d'), av.sprite, 0, 0, 48);
+    document.getElementById('gnt-prog-cname').textContent = G.charName;
+    // Build 5 nodes with pixel-art icons
+    const grid = document.getElementById('gnt-prog-nodes');
+    grid.innerHTML = '';
+    const nodeEls = [];
+    for (let r = 1; r <= 5; r++) {
+      const node = document.createElement('div');
+      node.className = 'gnt-node';
+      const isBoss = (r === 5);
+      const isCompleted = r <= G.wins;
+      const isCurrent = r === targetRound;
+      if (isBoss) node.classList.add('boss');
+      if (isCompleted) node.classList.add('completed');
+      else if (isCurrent) node.classList.add('current');
+      else node.classList.add('upcoming');
+      const num = document.createElement('div');
+      num.className = 'gnt-node-num';
+      num.textContent = isBoss ? 'BOSS' : 'R' + r;
+      // Pixel-art icon canvas
+      const iconWrap = document.createElement('div');
+      iconWrap.className = 'gnt-node-icon';
+      const iconCv = document.createElement('canvas');
+      iconCv.width = 48; iconCv.height = 48;
+      iconCv.style.cssText = 'width:48px;height:48px;background:transparent;image-rendering:pixelated;';
+      const kind = isCompleted ? 'completed' : (isBoss ? 'boss' : (isCurrent ? 'current' : 'upcoming'));
+      drawNodeIcon(iconCv, kind);
+      iconWrap.innerHTML = '';
+      iconWrap.appendChild(iconCv);
+      const label = document.createElement('div');
+      label.className = 'gnt-node-label';
+      label.textContent = GAUNTLET_ROUND_LABELS[r];
+      node.appendChild(num); node.appendChild(iconWrap); node.appendChild(label);
+      grid.appendChild(node);
+      nodeEls.push(node);
+    }
+    // Rope connector between nodes — defer so we can measure positions
+    setTimeout(() => drawRopeConnectors(grid, nodeEls), 50);
+    document.getElementById('gnt-prog-begin').textContent = targetRound === 5 ? 'FACE DAVY JONES' : `BEGIN ROUND ${targetRound}`;
+    document.getElementById('gnt-prog-begin').onclick = () => {
+      try { AUDIO.coinClink && AUDIO.coinClink(); } catch(e){}
+      hide('gnt-progression');
+      G.round += 1;
+      G.opponentLineup = pickRoundOpponents(G.round);
+      showOpponentIntro();
+    };
+    show('gnt-progression');
+    // Coin clink on previously-completed-round node entry (when round > 1)
+    if (G.round >= 1) {
+      try { AUDIO.coinClink && AUDIO.coinClink(); } catch(e){}
+    }
+  }
+
+  // --- Opponent intro card ---
+  function showOpponentIntro() {
+    const lbl = document.getElementById('gnt-opp-round');
+    lbl.textContent = `ROUND ${G.round}: ${GAUNTLET_ROUND_LABELS[G.round]}`;
+    const grid = document.getElementById('gnt-opp-grid');
+    grid.innerHTML = '';
+    for (const id of G.opponentLineup) {
+      const p = getPirate(id);
+      if (!p) continue;
+      const card = document.createElement('div');
+      card.className = 'gnt-opp-card';
+      const cv = document.createElement('canvas');
+      cv.width = 48; cv.height = 48;
+      cv.getContext('2d').imageSmoothingEnabled = false;
+      drawSpriteAt(cv.getContext('2d'), p.sprite, 0, 0, 48);
+      card.appendChild(cv);
+      const nm = document.createElement('div');
+      nm.className = 'gnt-opp-name'; nm.textContent = p.name;
+      card.appendChild(nm);
+      const tr = document.createElement('div');
+      tr.className = 'gnt-opp-trait'; tr.textContent = p.trait;
+      card.appendChild(tr);
+      grid.appendChild(card);
+    }
+    document.getElementById('gnt-opp-begin').onclick = () => {
+      hide('gnt-opponents');
+      beginGauntletMatch();
+    };
+    show('gnt-opponents');
+  }
+
+  // --- Match start with gauntlet difficulty applied ---
+  function beginGauntletMatch() {
+    const av = getAvatar(G.charId);
+    if (!av) { console.error('Gauntlet: no avatar'); return; }
+    selectedAvatar = av;
+    selectedAIs.clear();
+    G.opponentLineup.forEach(id => selectedAIs.add(id));
+    // Apply atmospheric tier to the match scene BEFORE starting.
+    try { SCENE.setGauntletAtmosphere && SCENE.setGauntletAtmosphere(G.round); } catch(e){}
+    // Scale ambient audio (rain heavier in storm rounds, wind harsher).
+    try { applyMatchAudioTier(G.round); } catch(e){}
+    // Use existing solo entry point.
+    startGameSolo(G.charName, [...selectedAIs], av);
+    // Bump baseline ship rocking — visible from R2 up.
+    state.boatRock = Math.max(state.boatRock || 0, [0, 0, 0.15, 0.30, 0.55, 0.85][G.round] || 0);
+    // After players are created, scale AI difficulty + Davy 6 dice.
+    const factor = GAUNTLET_DIFFICULTY[G.round] || 1;
+    for (const p of state.players) {
+      if (!p.isAI) continue;
+      // Wrap a per-match copy of the AI proto so we don't mutate the shared PIRATES entry.
+      const proto = p.ai;
+      p.ai = {
+        ...proto,
+        aggro: Math.min(1, (proto.aggro || 0.5) * factor),
+        callTreshold: Math.min(1, (proto.callTreshold || 0.4) * factor),
+      };
+      // Davy gets 6 dice in R5 (cursed die).
+      if (G.round === 5 && p.id === 'davy') {
+        p.dice = [1,1,1,1,1,1];
+      }
+    }
+  }
+
+  // --- Match-end hook ---
+  // Called by the patched showGameOverUI when a match ends.
+  function onMatchEnded(winnerIsHuman) {
+    if (!G.active) return false;
+    if (winnerIsHuman) {
+      G.wins += 1;
+      if (G.round >= 5) {
+        // Final win — victory ending.
+        setTimeout(() => showCutscene('victory', () => showVictoryScreen()), 1200);
+      } else {
+        const cutKey = ['afterR1','afterR2','afterR3','afterR4'][G.round - 1];
+        // Round 4 → 5 transition uses the dramatic "finalIntro" before the prog screen.
+        setTimeout(() => {
+          showCutscene(cutKey, () => {
+            if (G.round === 4) {
+              showCutscene('finalIntro', () => showProgressionScreen());
+            } else {
+              showProgressionScreen();
+            }
+          });
+        }, 1200);
+      }
+    } else {
+      // Loss → game over.
+      setTimeout(() => showCutscene('gameover', () => showGameoverScreen()), 1200);
+    }
+    return true;
+  }
+
+  function showVictoryScreen() {
+    const av = getAvatar(G.charId);
+    const cv = document.getElementById('gnt-vic-portrait');
+    cv.width = 64; cv.height = 64;
+    cv.getContext('2d').imageSmoothingEnabled = false;
+    cv.getContext('2d').clearRect(0,0,64,64);
+    if (av) drawSpriteAt(cv.getContext('2d'), av.sprite, 0, 0, 64);
+    // Tropical beach bg
+    const bg = document.getElementById('gnt-vic-bg');
+    bg.width = window.innerWidth; bg.height = window.innerHeight;
+    drawVictoryBg(bg);
+    const text = `The locker releases its hold on ${G.charName}.\n\n` +
+      `The Flying Dutchman sails into the horizon, its captain bested by yer wit and nerve at the dice. ` +
+      `The sea whispers of yer name now — the soul that beat Davy Jones at his own game.\n\n` +
+      `Ye are free.`;
+    document.getElementById('gnt-vic-text').textContent = text;
+    document.getElementById('gnt-vic-again').onclick = () => {
+      hide('gnt-victory');
+      reset();
+      showSetupForGauntlet();
+    };
+    document.getElementById('gnt-vic-menu').onclick = () => {
+      hide('gnt-victory');
+      reset();
+      try { resetForNewGame(); } catch(e){}
+      showTitle();
+    };
+    show('gnt-victory');
+    // Triumphant fanfare on entry, then a faint distant Davy laugh much later (ambiguity)
+    try { AUDIO.triumphFanfare && AUDIO.triumphFanfare(); } catch(e){}
+    setTimeout(() => { try { AUDIO.davyLaugh && AUDIO.davyLaugh(); } catch(e){} }, 6000);
+  }
+
+  function showGameoverScreen() {
+    const av = getAvatar(G.charId);
+    const cv = document.getElementById('gnt-go-portrait');
+    cv.width = 64; cv.height = 64;
+    cv.getContext('2d').imageSmoothingEnabled = false;
+    cv.getContext('2d').clearRect(0,0,64,64);
+    if (av) drawSpriteAt(cv.getContext('2d'), av.sprite, 0, 0, 64);
+    document.getElementById('gnt-go-text').textContent =
+      `The locker claims another. ${G.charName}'s soul joins the rest, drifting in the dark.`;
+    document.getElementById('gnt-go-again').onclick = () => {
+      hide('gnt-gameover');
+      reset();
+      showSetupForGauntlet();
+    };
+    document.getElementById('gnt-go-menu').onclick = () => {
+      hide('gnt-gameover');
+      reset();
+      try { resetForNewGame(); } catch(e){}
+      showTitle();
+    };
+    show('gnt-gameover');
+    // Lightning flash on entry — full screen white flash, then fade
+    const flashEl = document.createElement('div');
+    flashEl.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:300;pointer-events:none;animation:gntFlash 0.6s ease-out forwards;';
+    document.body.appendChild(flashEl);
+    setTimeout(() => flashEl.remove(), 700);
+    // Audio: thunder, soul-take, then davy laugh
+    try { AUDIO.lightningCrack && AUDIO.lightningCrack(); } catch(e){}
+    setTimeout(() => { try { AUDIO.thunder && AUDIO.thunder(); } catch(e){} }, 150);
+    setTimeout(() => { try { AUDIO.soulTake && AUDIO.soulTake(); } catch(e){} }, 600);
+    setTimeout(() => { try { AUDIO.davyLaugh && AUDIO.davyLaugh(); } catch(e){} }, 2400);
+    try { AUDIO.loseSting && AUDIO.loseSting(); AUDIO.wail && AUDIO.wail(); } catch(e){}
+  }
+
+  // --- Entry: open the standard char-pick UI but flag it as gauntlet ---
+  function showSetupForGauntlet() {
+    // Re-use the existing solo-mode setup screen, but force solo mode + lock
+    // opponents (we'll override at start).
+    showSetup();
+    try { applyMode('solo'); } catch(e){}
+    // Hide the AI-grid (gauntlet picks opponents from tiered pools)
+    const oppLabel = document.getElementById('opponent-label');
+    if (oppLabel && oppLabel.parentElement) oppLabel.parentElement.style.display = 'none';
+    // Hide the YE NAME input — gauntlet uses the chosen captain's preset name
+    const nameSection = document.getElementById('name-section');
+    if (nameSection) { nameSection.style.display = 'none'; nameSection.dataset.gntHidden = '1'; }
+    // Flag so the start button starts the gauntlet instead of a free match.
+    G.pendingStart = true;
+    const startBtn = document.getElementById('btn-start');
+    if (startBtn) startBtn.textContent = 'BEGIN GAUNTLET';
+  }
+
+  function tryStartFromSetup() {
+    if (!G.pendingStart) return false;
+    G.pendingStart = false;
+    // Restore name input visibility for non-gauntlet uses next time
+    const nameSection = document.getElementById('name-section');
+    if (nameSection && nameSection.dataset.gntHidden) {
+      nameSection.style.display = ''; delete nameSection.dataset.gntHidden;
+    }
+    // Use the avatar's preset name — no custom input in gauntlet
+    const charId = (selectedAvatar && selectedAvatar.id) || 'hook';
+    const charName = (selectedAvatar && selectedAvatar.name) || 'CAPTAIN';
+    startGauntlet(charId, charName);
+    return true;
+  }
+
+  // === Davy R5 tells: track if player just bluffed.
+  // Called after a hand reveal — bid was a bluff if actual count < bid.qty.
+  function recordBluffOutcome(bidder, bid, actualCount) {
+    if (!G.active || G.round !== 5) return;
+    if (!bidder || bidder.isAI) { G.lastPlayerBluff = false; return; }
+    G.lastPlayerBluff = (actualCount < bid.qty);
+  }
+
+  function getDavyBluffBoost() {
+    return (G.active && G.round === 5 && G.lastPlayerBluff) ? 0.15 : 0;
+  }
+
+  // === Davy R5 taunts ===
+  // Fired during Davy's turn in the boss match. Pulls from category pools.
+  let _lastTauntT = 0;
+  function maybeFireDavyTaunt(player, decision) {
+    if (!G.active || G.round !== 5) return;
+    if (player.id !== 'davy') return;
+    // Throttle: at most once per 4 seconds
+    const now = performance.now();
+    if (now - _lastTauntT < 4000) return;
+    let pool;
+    if (decision.type === 'liar') {
+      pool = G.lastPlayerBluff
+        ? GAUNTLET_DAVY_TAUNTS.onPlayerBluff
+        : GAUNTLET_DAVY_TAUNTS.onPlayerCalled;
+    } else {
+      // 30% chance of generic taunt on a regular bid
+      if (Math.random() > 0.3) return;
+      pool = GAUNTLET_DAVY_TAUNTS.onDavyWin;
+    }
+    if (!pool || !pool.length) return;
+    _lastTauntT = now;
+    const text = pool[Math.floor(Math.random() * pool.length)]
+      .replace(/\{char\}/g, G.charName);
+    fireTauntBubble(player, text);
+  }
+
+  function fireTauntBubble(player, text) {
+    // Use the existing state.effects system so it renders in the canvas scene.
+    const seat = player.seat || { x: 240, y: 80 };
+    state.effects.push({
+      type: 'tauntBubble',
+      x: seat.x, y: seat.y - 30,
+      text, t: 0, life: 3.0,
+    });
+  }
+
+  // === Helpers ===
+  // Show with fade-in (and clear the fade-in class on completion so future fades retrigger).
+  function show(id) {
+    const el = document.getElementById(id);
+    el.classList.remove('hidden', 'gnt-fade-out');
+    el.classList.add('gnt-fade-in');
+    setTimeout(() => el.classList.remove('gnt-fade-in'), 520);
+  }
+  // Hide with fade-out, then add hidden class.
+  function hide(id) {
+    const el = document.getElementById(id);
+    if (el.classList.contains('hidden')) return;
+    el.classList.remove('gnt-fade-in');
+    el.classList.add('gnt-fade-out');
+    setTimeout(() => {
+      el.classList.add('hidden');
+      el.classList.remove('gnt-fade-out');
+    }, 380);
+  }
+
+  return {
+    startGauntlet,
+    showSetupForGauntlet,
+    tryStartFromSetup,
+    onMatchEnded,
+    recordBluffOutcome,
+    getDavyBluffBoost,
+    maybeFireDavyTaunt,
+    isActive: () => G.active,
+    round: () => G.round,
+    state: G,
+    reset,
+  };
+})();
+
+// Wire the GAUNTLET button on the title screen.
+document.getElementById('btn-gauntlet').onclick = () => {
+  AUDIO.init(); AUDIO.blip(880, 0.08);
+  GAUNTLET.showSetupForGauntlet();
+};
+
+// Fullscreen toggle (always-visible button on title; reuses native API).
+(function wireFullscreen() {
+  const btn = document.getElementById('btn-fullscreen');
+  if (!btn) return;
+  function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  btn.addEventListener('click', () => {
+    AUDIO.init(); AUDIO.blip(660, 0.05);
+    const docEl = document.documentElement;
+    if (!isFs()) {
+      if (docEl.requestFullscreen) docEl.requestFullscreen({ navigationUI: 'hide' }).catch(()=>{});
+      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+      else { showToast('Fullscreen not supported on this browser'); }
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }
+  });
+  function syncIcon() {
+    btn.textContent = isFs() ? '⛚ EXIT FULLSCREEN' : '⛶ FULLSCREEN';
+  }
+  document.addEventListener('fullscreenchange', syncIcon);
+  document.addEventListener('webkitfullscreenchange', syncIcon);
+})();
+
+// Patch showGameOverUI to route to the gauntlet flow when active.
+const _origShowGameOverUI = showGameOverUI;
+showGameOverUI = function(winner) {
+  if (GAUNTLET.isActive()) {
+    const winnerIsHuman = winner && !winner.isAI;
+    // Suppress the standard PLAY AGAIN modal.
+    document.getElementById('gameover-overlay').classList.add('hidden');
+    GAUNTLET.onMatchEnded(winnerIsHuman);
+    return;
+  }
+  return _origShowGameOverUI(winner);
+};
+
+// Patch start-button click to route into gauntlet startup when applicable.
+const _btnStart = document.getElementById('btn-start');
+if (_btnStart) {
+  const _origStartHandler = _btnStart.onclick;
+  _btnStart.onclick = function(e) {
+    if (GAUNTLET.tryStartFromSetup()) return;
+    if (typeof _origStartHandler === 'function') return _origStartHandler.call(this, e);
+  };
+}
+
+// Hook bluff tracking into the reveal phase. We patch logEvent's reveal path
+// indirectly by wrapping where the bid+count are known. Easiest: hook a
+// post-reveal callback if one exists; otherwise track via the reveal section.
+// (Actual bluff tracking happens in the patched reveal logic below.)
+
+//=================================================================
 // MOBILE PORTRAIT IN-GAME UI
 // HTML-based UI that takes over from the canvas+HUD when in portrait
 // on a phone-sized screen. Mirrors state via update calls hooked into
@@ -5415,6 +8144,29 @@ const MOBILE = (() => {
 
   function setInGame(yes) {
     document.body.classList.toggle('in-game', !!yes);
+    moveCanvasIfNeeded();
+  }
+
+  // Teleport the canvas between #app (desktop) and #mob-canvas-slot (mobile portrait)
+  // so the table+character scene stays visible on mobile but doesn't break desktop.
+  function moveCanvasIfNeeded() {
+    const canvas = document.getElementById('scene');
+    const slot = document.getElementById('mob-canvas-slot');
+    const desktopParent = document.getElementById('app');
+    if (!canvas || !slot || !desktopParent) return;
+    // Switch canvas internal dimensions to portrait (270x480) on mobile portrait
+    // so the table renders as a vertical oval with players around it. Switch
+    // back to landscape (480x270) otherwise.
+    const wantPortraitCanvas = isMobilePortrait();
+    if (wantPortraitCanvas) SCENE.setOrientation('portrait');
+    else SCENE.setOrientation('landscape');
+    // Position canvas in the right DOM container
+    const wantMobileSlot = isMobilePortrait() && document.body.classList.contains('in-game');
+    if (wantMobileSlot && canvas.parentElement !== slot) {
+      slot.appendChild(canvas);
+    } else if (!wantMobileSlot && canvas.parentElement !== desktopParent) {
+      desktopParent.appendChild(canvas);
+    }
   }
 
   let lastTurnSig = null;
@@ -5734,6 +8486,31 @@ const MOBILE = (() => {
       document.getElementById('audio-toggle').click();
       renderControls();
     });
+    // Fullscreen toggle — uses the standard Fullscreen API (with a -webkit- fallback for iOS).
+    const fsBtn = document.getElementById('mob-fs-btn');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', () => {
+        vibrate(15);
+        const docEl = document.documentElement;
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        if (!isFs) {
+          if (docEl.requestFullscreen) docEl.requestFullscreen({ navigationUI: 'hide' }).catch(()=>{});
+          else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+          else { showToast('Fullscreen not supported on this browser'); }
+        } else {
+          if (document.exitFullscreen) document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
+      });
+      // Keep the icon in sync with current state (⛶ exit-fullscreen, ⛚ enter-fullscreen)
+      function updateFsIcon() {
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        fsBtn.textContent = isFs ? '⛚' : '⛶';
+        fsBtn.title = isFs ? 'Exit fullscreen' : 'Enter fullscreen';
+      }
+      document.addEventListener('fullscreenchange', updateFsIcon);
+      document.addEventListener('webkitfullscreenchange', updateFsIcon);
+    }
     document.getElementById('mob-leave-btn').addEventListener('click', () => {
       vibrate(20);
       if (confirm('Leave the table?')) {
@@ -5750,12 +8527,20 @@ const MOBILE = (() => {
   }
   wireButtons();
 
-  // Recheck on resize/orientation change
-  mql.addEventListener('change', renderAll);
-  window.addEventListener('resize', renderAll);
-  window.addEventListener('orientationchange', () => setTimeout(renderAll, 250));
+  // Recheck on resize/orientation change. moveCanvasIfNeeded must run too so
+  // the canvas gets teleported between #app and #mob-canvas-slot when the user
+  // rotates the phone or switches devices.
+  function rerunAll() { moveCanvasIfNeeded(); renderAll(); }
+  mql.addEventListener('change', rerunAll);
+  window.addEventListener('resize', rerunAll);
+  window.addEventListener('orientationchange', () => setTimeout(rerunAll, 250));
 
-  return { renderAll, setInGame, isMobilePortrait };
+  // Initial pass: switch canvas to portrait dims immediately on mobile so the
+  // title-screen storm scene composes vertically (waves fill bottom of viewport,
+  // ship is sized off canvas H not W) instead of getting cropped from a 480x270 canvas.
+  moveCanvasIfNeeded();
+
+  return { renderAll, setInGame, isMobilePortrait, moveCanvasIfNeeded };
 })();
 
 // Hook updateBanner / updateControls / renderLog so mobile UI stays in sync
