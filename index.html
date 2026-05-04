@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Liar's Dice">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0604">
 <title>Liar's Dice — Dead Man's Chest</title>
@@ -180,6 +182,52 @@
     pointer-events: auto;
   }
   #audio-toggle:hover { border-color: #f4d27a; }
+  /* iOS "Add to Home Screen" hint shown once on iOS Safari when user
+     taps fullscreen — there's no JS API for true fullscreen on iPhone, so
+     this guides them to the only real path: standalone PWA install. */
+  #fs-ios-hint {
+    position: fixed; inset: 0; z-index: 500;
+    background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    padding: 6vh 6vw;
+    font-family: 'Press Start 2P', monospace;
+    color: #f4d27a;
+  }
+  #fs-ios-hint .fs-hint-card {
+    background: linear-gradient(to bottom, #2a1808 0%, #1a0e04 100%);
+    border: 4px solid #f4d27a;
+    box-shadow: 0 0 0 2px #2a0808, 0 0 30px rgba(255,140,40,0.4);
+    padding: 1.4em 1.2em;
+    max-width: 360px; width: 100%;
+    text-align: center;
+  }
+  #fs-ios-hint .fs-hint-title {
+    font-size: 13px;
+    color: #f4d27a;
+    text-shadow: 2px 2px 0 #6a2010;
+    letter-spacing: 2px;
+    margin-bottom: 1em;
+  }
+  #fs-ios-hint .fs-hint-body {
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    color: #d8b878; text-align: left;
+    margin-bottom: 1.2em;
+  }
+  #fs-ios-hint .fs-hint-body p { margin: 0 0 0.8em 0; }
+  #fs-ios-hint .fs-hint-body ol { padding-left: 1.4em; margin: 0; }
+  #fs-ios-hint .fs-hint-body li { margin-bottom: 0.5em; }
+  #fs-ios-hint .fs-hint-body b { color: #f4d27a; }
+  #fs-ios-hint .fs-hint-btn {
+    font-family: 'Press Start 2P', monospace;
+    background: #6a2010; color: #f4d27a;
+    border: 3px solid #f4d27a;
+    padding: 0.8em 1.6em; font-size: 11px;
+    cursor: pointer; min-height: 44px;
+    text-shadow: 2px 2px 0 #2a0808;
+  }
+  #fs-ios-hint .fs-hint-btn:hover { background: #8a3020; }
+
   /* Fake fullscreen for iOS Safari/Chrome (where the Fullscreen API isn't
      available on arbitrary elements). Pins the app to the visual viewport
      and locks scroll so the browser chrome retreats. */
@@ -245,12 +293,12 @@
   #title-screen .btn-new {
     font-family: 'Press Start 2P', monospace;
     background: #6a2010; color: #f4d27a;
-    border: 4px solid #f4d27a;
-    padding: 1.2em 2.4em;
-    font-size: clamp(14px, 1.8vw, 22px);
+    border: 3px solid #f4d27a;
+    padding: 0.9em 1.8em;
+    font-size: clamp(13px, 1.6vw, 18px);
     cursor: pointer;
     text-shadow: 2px 2px 0 #2a0808;
-    box-shadow: 0 0 0 4px #2a0808, 0 0 30px rgba(255,140,40,0.4);
+    box-shadow: 0 0 0 3px #2a0808, 0 0 24px rgba(255,140,40,0.35);
     animation: btnGlow 1.6s ease-in-out infinite;
     letter-spacing: 3px;
   }
@@ -533,6 +581,97 @@
     #go-portrait { width: 80px; height: 80px; }
     /* Toast — keep readable on small screens */
     #toast { font-size: 14px; padding: 16px 24px; max-width: 80vw; }
+    /* In mobile portrait the toast (e.g. "LIAR! X LOSES A DIE") would sit
+       dead-center, directly over the front player sprite. Pin it near the
+       top so it sits over the canvas sky/wall area instead. */
+    body.in-game #toast,
+    #toast {
+      top: clamp(60px, 9vh, 100px);
+      padding: 12px 20px !important;
+      font-size: 12px !important;
+      max-width: 88vw;
+      transform: translate(-50%, 0);
+    }
+
+    /* === Cutscene (mobile portrait) — Persona/Pokemon-style ===
+       The painted bg canvas (drawQuartersBg) uses fixed pixel offsets
+       designed for 1280x720 landscape; on portrait its elements clump
+       in the upper band and look broken. Hide it and use a CSS
+       atmospheric backdrop. Speaker badges are compact, dialogue is
+       the focal point. */
+    #gnt-cutscene .gnt-bg-canvas { display: none !important; }
+    /* !important needed because the unconditional `#gnt-cutscene { background: none; }`
+       rule below in source order would otherwise win cascade tie. */
+    #gnt-cutscene {
+      padding: 0 !important;
+      background:
+        radial-gradient(ellipse at 50% 18%, rgba(120,60,30,0.35) 0%, rgba(0,0,0,0) 55%),
+        radial-gradient(ellipse at 50% 90%, rgba(60,20,10,0.40) 0%, rgba(0,0,0,0) 60%),
+        linear-gradient(to bottom, #1a0e04 0%, #0a0602 50%, #050200 100%),
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.35) 0 4px, transparent 4px 8px) !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      justify-content: flex-start !important;
+      overflow-y: auto !important;
+    }
+    #gnt-cutscene .gnt-cut-row {
+      display: grid !important;
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas: "davy vs player";
+      align-items: center;
+      gap: 8px;
+      margin: 0 !important;
+      padding: max(2vh, env(safe-area-inset-top, 0px)) 4vw 0 4vw;
+      width: 100%;
+      flex: 0 0 auto !important;
+      align-self: flex-start !important;
+    }
+    #gnt-cut-davy-wrap   { grid-area: davy; }
+    #gnt-cutscene .gnt-cut-vs { grid-area: vs; justify-self: center; }
+    #gnt-cut-player-wrap { grid-area: player; }
+    .gnt-cut-portrait { gap: 4px; }
+    .gnt-cut-portrait canvas {
+      width: clamp(56px, 18vw, 88px) !important;
+      height: clamp(56px, 18vw, 88px) !important;
+      border: 3px solid #6a4020;
+      box-shadow: 0 0 0 2px #2a0808, 0 0 14px rgba(255,140,40,0.18);
+      background: #0a0604;
+    }
+    .gnt-cut-pname {
+      font-size: 8px;
+      max-width: 32vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #gnt-cutscene .gnt-cut-vs {
+      font-size: clamp(20px, 6vw, 32px);
+      letter-spacing: 4px;
+      transition: opacity 0.25s ease;
+    }
+    #gnt-cutscene[data-speaker="davy"]   #gnt-cut-player-wrap { opacity: 0.35; filter: grayscale(0.6); }
+    #gnt-cutscene[data-speaker="player"] #gnt-cut-davy-wrap   { opacity: 0.35; filter: grayscale(0.6); }
+    #gnt-cutscene[data-line-idx]:not([data-line-idx="0"]) .gnt-cut-vs { opacity: 0.25; }
+    #gnt-cutscene .gnt-dialogue {
+      position: relative;
+      left: auto; right: auto; bottom: auto;
+      margin: auto 4vw calc(3vh + env(safe-area-inset-bottom, 0px)) 4vw;
+      padding: 1.1em 1em 0.9em 1em;
+      min-height: 32vh;
+      max-width: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7em;
+    }
+    #gnt-cutscene .gnt-dialogue-speaker { font-size: 11px; }
+    #gnt-cutscene .gnt-dialogue-text {
+      font-size: clamp(13px, 2.4vh, 17px);
+      line-height: 1.7;
+      flex: 1;
+    }
+    #gnt-cutscene .gnt-dialogue-hint {
+      font-size: 9px; text-align: center; opacity: 0.7;
+    }
   }
 
   /* Tighter status-banner positioning when in mobile column layout */
@@ -613,21 +752,6 @@
     #gnt-backstory .gnt-back-line { font-size: clamp(9px, 1.7vh, 12px); max-width: 80vw; }
     .gnt-back-hint { font-size: 7px; margin-top: 0.4em; }
 
-    /* Cutscene — portraits side by side, dialogue at bottom.
-       Sized so both portraits + the VS marker fit comfortably across the
-       phone width without wrapping or pushing the dialogue off-screen. */
-    #gnt-cutscene .gnt-cut-row {
-      margin-top: 2vh; gap: clamp(8px, 3vw, 20px);
-      flex-wrap: nowrap;
-      width: 100%;
-      justify-content: space-evenly;
-    }
-    .gnt-cut-portrait canvas {
-      width: clamp(80px, 26vw, 128px) !important;
-      height: clamp(80px, 26vw, 128px) !important;
-    }
-    .gnt-cut-pname { font-size: 9px; }
-    .gnt-cut-vs { font-size: clamp(18px, 4.5vh, 32px); letter-spacing: 4px; }
     .gnt-dialogue {
       padding: 0.6em 0.9em; min-height: 64px;
       bottom: 1vh; left: 2vw; right: 2vw;
@@ -697,9 +821,9 @@
   #btn-gauntlet {
     background: #4a1010;
     border-color: #f48030;
-    box-shadow: 0 0 0 4px #2a0808, 0 0 30px rgba(255,80,40,0.55);
-    font-size: clamp(13px, 1.7vw, 20px);
-    letter-spacing: 3px;
+    box-shadow: 0 0 0 3px #2a0808, 0 0 24px rgba(255,80,40,0.55);
+    font-size: clamp(12px, 1.5vw, 16px);
+    letter-spacing: 2px;
   }
   #btn-gauntlet:hover { background: #6a1818; }
   .title-gauntlet-sub {
@@ -1343,9 +1467,9 @@
     /* Lobby + title + menu still work — they're already mostly HTML — but tighten them. */
     #title-screen h1 { font-size: clamp(36px, 12vw, 56px); }
     #title-screen .title-stack { padding: 6vh 6vw; }
-    .title-online-row { flex-direction: column; gap: 8px; align-items: stretch; }
-    .title-online-row .btn { padding: 1em 1.4em; min-height: 52px; }
-    #title-screen .btn-new { padding: 1.2em 2em; min-height: 60px; font-size: clamp(16px, 4.5vw, 22px); }
+    .title-online-row { flex-direction: column; gap: 6px; align-items: stretch; }
+    .title-online-row .btn { padding: 0.75em 1.2em; min-height: 42px; font-size: 11px; }
+    #title-screen .btn-new { padding: 0.9em 1.6em; min-height: 48px; font-size: clamp(13px, 3.6vw, 17px); }
     #online-lobby, #online-join {
       padding: calc(4vh + env(safe-area-inset-top)) 4vw calc(4vh + env(safe-area-inset-bottom)) 4vw;
       align-items: stretch;
@@ -3013,6 +3137,16 @@ const SCENE = (() => {
   function recomputeLayout() {
     const isPortrait = H > W;
     if (isPortrait) {
+      // Restored to the original cozy cabin aesthetic: a tall ellipse
+      // table, full window/sky band, full wall band. Opponents sit in
+      // the back wall area at large readable scales, just like the
+      // landscape layout. The grid slot system (assignSeatsPortraitGrid)
+      // handles 4-5 opponents by adding flanking side seats — the
+      // visuals stay this layout regardless.
+      TABLE.cx = W/2;
+      TABLE.cy = Math.round(H * 0.62);
+      TABLE.rx = Math.round(W * 0.38);
+      TABLE.ry = Math.round(H * 0.22);
       LAYOUT = {
         skyEnd: Math.round(H * 0.16),
         wallStart: Math.round(H * 0.16),
@@ -3025,10 +3159,6 @@ const SCENE = (() => {
         krakenCount: 2,
         krakenSpacing: Math.round(W / 3),
       };
-      TABLE.cx = W/2;
-      TABLE.cy = Math.round(H * 0.62);
-      TABLE.rx = Math.round(W * 0.38);
-      TABLE.ry = Math.round(H * 0.22);
     } else {
       LAYOUT = {
         skyEnd: 60,
@@ -5088,6 +5218,15 @@ function assignSeats() {
   const all = state.players;
   const n = all.length;
   const portrait = SCENE.H > SCENE.W;
+
+  // Portrait: a narrow canvas can't fit 4-6 players on a single back arc
+  // without overlap, so we use explicit slot positions. Up to 3 opponents
+  // sit above the table; 4-5 add flanking seats beside the table to the
+  // left and right of the player. Branch out and return early.
+  if (portrait) {
+    return assignSeatsPortraitGrid(all, T);
+  }
+
   // Player[0] sits at front (closest to camera). Everyone else spreads across the back arc.
   // Front angle = +PI/2 (bottom of ellipse). Back center = -PI/2 (top).
   const angles = [Math.PI/2];
@@ -5095,43 +5234,15 @@ function assignSeats() {
   if (back === 1) {
     angles.push(-Math.PI/2);
   } else if (back > 1) {
-    // Spread tuned per player count. In portrait we keep the arc narrower
-    // so outermost seats don't get pushed against the canvas edges (where
-    // their name labels would clip).
-    let spread;
-    if (portrait) {
-      // back=2→0.70π, back=3→0.78π, back=4→0.84π, back=5→0.88π (capped)
-      spread = Math.min(Math.PI * 0.88, Math.PI * (0.56 + 0.08 * back));
-    } else {
-      spread = Math.PI * 0.85;
-    }
+    const spread = Math.PI * 0.85;
     for (let i = 0; i < back; i++) {
       const t = i / (back - 1);
       angles.push(-Math.PI/2 - spread/2 + t*spread);
     }
   }
 
-  // Per-player-count sprite scales tuned for portrait + landscape. Front
-  // sprite is always largest; back row scales with available room. Smaller
-  // back-row sprites in portrait keep names from overlapping when 4-6 players.
-  function scaleForSeat(idx, total) {
-    if (idx === 0) return portrait ? 2.6 : 3.0; // front
-    if (portrait) {
-      if (total <= 2) return 2.2;
-      if (total === 3) return 2.0;
-      if (total === 4) return 1.7;
-      if (total === 5) return 1.5;
-      return 1.4; // 6+
-    } else {
-      return 3; // landscape unchanged
-    }
-  }
-  // Cup scale — kept clearly smaller than the player sprite so the cup
-  // never visually dominates a back-row character.
-  function cupScaleForSeat(seatScale) {
-    if (!portrait) return 1; // landscape unchanged
-    return Math.max(0.45, Math.min(0.85, seatScale * 0.30));
-  }
+  function scaleForSeat(idx) { return idx === 0 ? 3.0 : 3; }
+  function cupScaleForSeat() { return 1; }
 
   // In online play, each device shows its own player at the front. Locally,
   // hot-seat = 2+ humans on one screen.
@@ -5144,20 +5255,9 @@ function assignSeats() {
   // Index 0 in the angles array corresponds to the front; map local-player-index there.
   for (let i = 0; i < n; i++) {
     const a = angles[i];
-    // Tight ring — sprites sit right at the table edge.
-    // In portrait we cap the horizontal ring so back-row sprites + names
-    // always have safe-area padding from the canvas edges, and we expand
-    // ringRy a touch so the topmost seat doesn't hug the back wall.
-    let ringRx, ringRy;
-    if (portrait) {
-      // Reserve ~14px for half a name label on each side.
-      const maxRx = Math.max(40, (SCENE.W / 2) - 14);
-      ringRx = Math.min(T.rx + 4, maxRx);
-      ringRy = T.ry + 12;
-    } else {
-      ringRx = T.rx + 8;
-      ringRy = T.ry + 14;
-    }
+    // Tight ring — sprites sit right at the table edge
+    const ringRx = T.rx + 8;
+    const ringRy = T.ry + 14;
     const x = T.cx + Math.cos(a) * ringRx;
     const y = T.cy + Math.sin(a) * ringRy;
     // Compute which player object this seat is for — front (i=0) goes to local player online.
@@ -5180,6 +5280,120 @@ function assignSeats() {
       // Cups sit on the table edge inside the player's seat (between seat and center)
       cupX: Math.round(T.cx + Math.cos(a) * (T.rx - 18) - cupHalfW),
       cupY: Math.round(T.cy + Math.sin(a) * (T.ry - 10) - cupHalfH),
+    };
+  }
+}
+
+// Portrait-only seating: explicit slot positions per opponent count.
+// Up to 3 opponents fit above the table; 4-5 add flanking seats beside
+// the table on the left/right. Slot fields are canvas fractions so the
+// layout adapts whether the canvas is short or tall.
+function assignSeatsPortraitGrid(all, T) {
+  const W = SCENE.W, H = SCENE.H;
+  const n = all.length;
+  const opps = Math.max(0, n - 1);
+  // All slot positions are anchored against the actual table geometry
+  // (T.cx, T.cy, T.rx, T.ry) — not raw H fractions — so the layout is
+  // correct on any canvas aspect (short, tall, square).
+  // - Top-row opponents sit with feet at the back edge of the table top
+  //   (T.cy - T.ry + small), bodies rising into the cabin wall.
+  // - Side opponents sit with feet at table center y, just outside the
+  //   table's left/right edge.
+  // - Player feet anchor near the canvas bottom; the sprite extends up
+  //   over the table front edge.
+  // Top-row feet hover just above the table back edge so sprites stand
+  // in front of the cabin wall. Side feet drop to the table center y so
+  // flanking sprites sit beside the table at table-rim height — between
+  // the top row above them and the player below.
+  const TOP_FEET_Y = T.cy - T.ry - 4;
+  const SIDE_FEET_Y = T.cy + Math.round(T.ry * 0.30);
+  const SIDE_LX = Math.max(28, T.cx - T.rx - 8);
+  const SIDE_RX = Math.min(W - 28, T.cx + T.rx + 8);
+  // Player feet anchor near canvas bottom; sprite extends up over the
+  // table's front edge so the body straddles the front rim like in the
+  // landscape layout.
+  const PLAYER_Y = Math.min(H - 4, T.cy + T.ry + 56);
+  const PLAYER = { x: T.cx, y: PLAYER_Y, scale: 3.2 };
+  const SLOTS = {
+    1: [
+      { x: T.cx, y: TOP_FEET_Y, scale: 3.2, anchor: 'top' },
+    ],
+    2: [
+      { x: T.cx - Math.round(T.rx * 0.62), y: TOP_FEET_Y + 4, scale: 3.0, anchor: 'top' },
+      { x: T.cx + Math.round(T.rx * 0.62), y: TOP_FEET_Y + 4, scale: 3.0, anchor: 'top' },
+    ],
+    3: [
+      { x: T.cx - Math.round(T.rx * 0.85), y: TOP_FEET_Y + 16, scale: 2.7, anchor: 'top' },
+      { x: T.cx,                           y: TOP_FEET_Y - 14, scale: 2.7, anchor: 'top' },
+      { x: T.cx + Math.round(T.rx * 0.85), y: TOP_FEET_Y + 16, scale: 2.7, anchor: 'top' },
+    ],
+    4: [
+      // 3-across back row + 1 mid... actually we use 2-across back + 2 sides
+      // so each opponent has guaranteed name space without overlap.
+      { x: T.cx - Math.round(T.rx * 0.55), y: TOP_FEET_Y + 4, scale: 2.6, anchor: 'top' },
+      { x: T.cx + Math.round(T.rx * 0.55), y: TOP_FEET_Y + 4, scale: 2.6, anchor: 'top' },
+      { x: SIDE_LX,                        y: SIDE_FEET_Y,    scale: 2.4, anchor: 'left' },
+      { x: SIDE_RX,                        y: SIDE_FEET_Y,    scale: 2.4, anchor: 'right' },
+    ],
+    5: [
+      { x: T.cx - Math.round(T.rx * 0.78), y: TOP_FEET_Y + 14, scale: 2.3, anchor: 'top' },
+      { x: T.cx,                           y: TOP_FEET_Y - 12, scale: 2.3, anchor: 'top' },
+      { x: T.cx + Math.round(T.rx * 0.78), y: TOP_FEET_Y + 14, scale: 2.3, anchor: 'top' },
+      { x: SIDE_LX,                        y: SIDE_FEET_Y + 6, scale: 2.2, anchor: 'left' },
+      { x: SIDE_RX,                        y: SIDE_FEET_Y + 6, scale: 2.2, anchor: 'right' },
+    ],
+  };
+  const slots = SLOTS[opps] || [];
+
+  const online = (state.netMode === 'host' || state.netMode === 'client');
+  const localPlayerIdx = online
+    ? Math.max(0, state.players.findIndex(p => p.peerId && p.peerId === NET.myId))
+    : 0;
+  const isHotseat = !online && state.players.filter(p => !p.isAI).length >= 2;
+
+  for (let i = 0; i < n; i++) {
+    const slot = (i === 0) ? PLAYER : slots[i - 1];
+    if (!slot) continue;
+    const playerForSeat = online
+      ? (i === 0 ? all[localPlayerIdx] : all[(localPlayerIdx + i) % n])
+      : all[i];
+    const isFront = (i === 0) && (!isHotseat ? !playerForSeat.isAI : true);
+    const x = Math.round(slot.x);
+    const y = Math.round(slot.y);
+    // Cup scale tracks sprite scale so cups read at a consistent visual
+    // weight against each character (~28% of sprite scale, clamped).
+    const cs = isFront
+      ? 0.75
+      : Math.max(0.55, Math.min(0.95, slot.scale * 0.32));
+    const cupHalfW = 15 * cs;
+    const cupHalfH = 11 * cs;
+    let cupX, cupY, angle;
+    if (isFront) {
+      // Front cup is hidden during play; placement only matters during reveal.
+      angle = Math.PI / 2;
+      cupX = Math.round(T.cx + Math.cos(angle) * (T.rx - 18) - cupHalfW);
+      cupY = Math.round(T.cy + Math.sin(angle) * (T.ry - 10) - cupHalfH);
+    } else {
+      // Anchor cup along a direction from table center matching the slot side.
+      // 'top' anchors get a true atan2 from table center (curves with slot x).
+      // 'left' / 'right' anchors hug the table's horizontal edges so cups
+      // sit cleanly beside flanking seats without floating into the center.
+      if (slot.anchor === 'left') {
+        angle = Math.PI;
+      } else if (slot.anchor === 'right') {
+        angle = 0;
+      } else {
+        angle = Math.atan2(y - T.cy, x - T.cx);
+      }
+      cupX = Math.round(T.cx + Math.cos(angle) * (T.rx - 14) - cupHalfW);
+      cupY = Math.round(T.cy + Math.sin(angle) * (T.ry - 8) - cupHalfH);
+    }
+    playerForSeat.seat = {
+      x, y, angle,
+      side: isFront ? 'front' : 'back',
+      scale: slot.scale,
+      cupScale: cs,
+      cupX, cupY,
     };
   }
 }
@@ -5591,14 +5805,27 @@ function drawPlayers(dt) {
       ctx.fillRect(s.x - 50, s.y - 50, 100, 70);
     }
     drawSpriteAt(ctx, p.sprite, sx, sy, spriteSize);
-    // Name above sprite — clamp x so the centered label stays inside the canvas
+    // Name above sprite — clamp x so the centered label stays inside the canvas.
+    // In portrait with small back-row sprites, drop a notch in font size and
+    // truncate long names so they never overrun a flanking seat.
     ctx.fillStyle = isCurrent ? '#f4d27a' : (p.alive ? '#a88860' : '#6a3030');
-    ctx.font = '7px "Press Start 2P"';
+    const portrait = SCENE.H > SCENE.W;
+    const tightLabel = portrait && scale < 1.8;
+    ctx.font = tightLabel ? '6px "Press Start 2P"' : '7px "Press Start 2P"';
     ctx.textAlign = 'center';
-    const nameW = ctx.measureText(p.name).width;
     const padX = 4;
+    let label = p.name;
+    let nameW = ctx.measureText(label).width;
+    const maxLabelW = Math.max(40, SCENE.W - 2*padX);
+    if (nameW > maxLabelW) {
+      while (label.length > 3 && ctx.measureText(label + '…').width > maxLabelW) {
+        label = label.slice(0, -1);
+      }
+      label += '…';
+      nameW = ctx.measureText(label).width;
+    }
     const labelX = Math.max(nameW/2 + padX, Math.min(SCENE.W - nameW/2 - padX, s.x));
-    ctx.fillText(p.name, labelX, sy - 8);
+    ctx.fillText(label, labelX, sy - 8);
     // Dice-count dots — clamp the row inside the canvas as well
     const dots = 5;
     const dotsW = dots * 4;
@@ -7818,6 +8045,11 @@ const GAUNTLET = (() => {
       const l = lines[lineIdx];
       speakerEl.textContent = l.who === 'davy' ? 'DAVY JONES' : G.charName;
       speakerEl.style.color = l.who === 'davy' ? '#f48030' : '#80c0d0';
+      // Mobile speaker-focus + VS-fade after first line are CSS-driven via
+      // these data attributes on the cutscene container.
+      const root = document.getElementById('gnt-cutscene');
+      root.dataset.speaker = l.who === 'davy' ? 'davy' : 'player';
+      root.dataset.lineIdx = String(lineIdx);
       fullLine = subst(l.text);
       charIdx = 0;
       typing = true;
@@ -8468,14 +8700,29 @@ document.getElementById('btn-gauntlet').onclick = () => {
 // URL bar away, and locks scroll so the experience feels fullscreen.
 window.FS = (function () {
   const docEl = document.documentElement;
+  // iOS Safari/Chrome on iPhone do NOT support requestFullscreen on
+  // arbitrary elements; only on <video>. The closest path to true
+  // fullscreen on iOS is "Add to Home Screen" which launches the page
+  // standalone (no URL bar/tabs) thanks to apple-mobile-web-app-capable.
+  // Detect iOS so we can show a one-time install hint instead of just
+  // silently falling back to CSS fake-fs.
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = !!(window.navigator.standalone) ||
+                       window.matchMedia('(display-mode: standalone)').matches ||
+                       window.matchMedia('(display-mode: fullscreen)').matches;
   const nativeSupported = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+
   function isFakeFs() { return document.body.classList.contains('fake-fs'); }
   function isFs() {
-    return !!(document.fullscreenElement || document.webkitFullscreenElement) || isFakeFs();
+    return isStandalone ||
+           !!(document.fullscreenElement || document.webkitFullscreenElement) ||
+           isFakeFs();
   }
+
   function enterFake() {
     document.body.classList.add('fake-fs');
-    // Nudge URL bar away on iOS Safari.
     setTimeout(() => { try { window.scrollTo(0, 1); } catch (e) {} }, 50);
     fireSync();
   }
@@ -8483,28 +8730,65 @@ window.FS = (function () {
     document.body.classList.remove('fake-fs');
     fireSync();
   }
+
+  // Show a one-time install hint on iOS Safari (not standalone) explaining
+  // how to get TRUE fullscreen via Add to Home Screen. Stored in
+  // localStorage so we don't nag on every toggle.
+  function showIOSInstallHint() {
+    if (localStorage.getItem('fs-ios-hint-seen')) return;
+    localStorage.setItem('fs-ios-hint-seen', '1');
+    const overlay = document.createElement('div');
+    overlay.id = 'fs-ios-hint';
+    overlay.innerHTML =
+      '<div class="fs-hint-card">' +
+        '<div class="fs-hint-title">FOR TRUE FULLSCREEN</div>' +
+        '<div class="fs-hint-body">' +
+          '<p>iOS won\'t let web pages go fullscreen, but ye can install this page to yer home screen for a true fullscreen experience:</p>' +
+          '<ol>' +
+            '<li>Tap the <b>Share</b> button in Safari</li>' +
+            '<li>Pick <b>Add to Home Screen</b></li>' +
+            '<li>Launch from the new icon — no URL bar!</li>' +
+          '</ol>' +
+        '</div>' +
+        '<button class="fs-hint-btn">GOT IT</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('.fs-hint-btn').onclick = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  }
+
   function enter() {
+    if (isStandalone) { fireSync(); return; }
+    // Try native first (works on Android Chrome, desktop, iPad iOS 16.4+)
     if (docEl.requestFullscreen) {
-      docEl.requestFullscreen({ navigationUI: 'hide' }).catch(() => enterFake());
-    } else if (docEl.webkitRequestFullscreen) {
-      try { docEl.webkitRequestFullscreen(); }
-      catch (e) { enterFake(); }
-    } else {
-      enterFake();
+      docEl.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
+        if (isIOS) showIOSInstallHint();
+        enterFake();
+      });
+      return;
     }
+    if (docEl.webkitRequestFullscreen) {
+      try { docEl.webkitRequestFullscreen(); return; }
+      catch (e) { /* fall through */ }
+    }
+    // No native support — iOS path. Apply fake-fs and offer the
+    // standalone install hint.
+    if (isIOS) showIOSInstallHint();
+    enterFake();
   }
   function exit() {
+    if (isStandalone) return; // can't exit standalone from JS
     if (isFakeFs()) { exitFake(); return; }
     if (document.exitFullscreen) document.exitFullscreen();
     else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
   }
-  function toggle() { if (isFs()) exit(); else enter(); }
+  function toggle() { if (isFs() && !isStandalone) exit(); else enter(); }
   const _listeners = [];
   function onChange(fn) { _listeners.push(fn); }
   function fireSync() { _listeners.forEach(f => { try { f(); } catch (e) {} }); }
   document.addEventListener('fullscreenchange', fireSync);
   document.addEventListener('webkitfullscreenchange', fireSync);
-  return { enter, exit, toggle, isFs, onChange, nativeSupported };
+  return { enter, exit, toggle, isFs, onChange, nativeSupported, isIOS, isStandalone };
 })();
 
 // Fullscreen toggle (always-visible button on title).
