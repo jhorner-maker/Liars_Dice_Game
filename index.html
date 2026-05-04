@@ -180,6 +180,24 @@
     pointer-events: auto;
   }
   #audio-toggle:hover { border-color: #f4d27a; }
+  /* Fake fullscreen for iOS Safari/Chrome (where the Fullscreen API isn't
+     available on arbitrary elements). Pins the app to the visual viewport
+     and locks scroll so the browser chrome retreats. */
+  body.fake-fs {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body.fake-fs #app,
+  body.fake-fs #title-screen,
+  body.fake-fs #menu,
+  body.fake-fs #online-lobby,
+  body.fake-fs #online-join {
+    width: 100vw; height: 100vh;
+    height: 100dvh;
+  }
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-track { background: #1a1004; }
   ::-webkit-scrollbar-thumb { background: #6a4020; }
@@ -595,9 +613,19 @@
     #gnt-backstory .gnt-back-line { font-size: clamp(9px, 1.7vh, 12px); max-width: 80vw; }
     .gnt-back-hint { font-size: 7px; margin-top: 0.4em; }
 
-    /* Cutscene — portraits side by side, dialogue at bottom */
-    #gnt-cutscene .gnt-cut-row { margin-top: 1vh; gap: 1.5em; }
-    .gnt-cut-portrait canvas { width: 192px !important; height: 192px !important; }
+    /* Cutscene — portraits side by side, dialogue at bottom.
+       Sized so both portraits + the VS marker fit comfortably across the
+       phone width without wrapping or pushing the dialogue off-screen. */
+    #gnt-cutscene .gnt-cut-row {
+      margin-top: 2vh; gap: clamp(8px, 3vw, 20px);
+      flex-wrap: nowrap;
+      width: 100%;
+      justify-content: space-evenly;
+    }
+    .gnt-cut-portrait canvas {
+      width: clamp(80px, 26vw, 128px) !important;
+      height: clamp(80px, 26vw, 128px) !important;
+    }
     .gnt-cut-pname { font-size: 9px; }
     .gnt-cut-vs { font-size: clamp(18px, 4.5vh, 32px); letter-spacing: 4px; }
     .gnt-dialogue {
@@ -5067,12 +5095,13 @@ function assignSeats() {
   if (back === 1) {
     angles.push(-Math.PI/2);
   } else if (back > 1) {
-    // Spread tuned per player count: more back-row players need a wider arc
-    // but never wide enough that seats land beside the front player.
+    // Spread tuned per player count. In portrait we keep the arc narrower
+    // so outermost seats don't get pushed against the canvas edges (where
+    // their name labels would clip).
     let spread;
     if (portrait) {
-      // back=1→PI*0 (single seat opposite), back=2→PI*0.6, …, capped at PI*0.95
-      spread = Math.min(Math.PI * 0.95, Math.PI * (0.4 + 0.18 * back));
+      // back=2→0.70π, back=3→0.78π, back=4→0.84π, back=5→0.88π (capped)
+      spread = Math.min(Math.PI * 0.88, Math.PI * (0.56 + 0.08 * back));
     } else {
       spread = Math.PI * 0.85;
     }
@@ -5083,15 +5112,16 @@ function assignSeats() {
   }
 
   // Per-player-count sprite scales tuned for portrait + landscape. Front
-  // sprite is always largest; back row scales with available room.
+  // sprite is always largest; back row scales with available room. Smaller
+  // back-row sprites in portrait keep names from overlapping when 4-6 players.
   function scaleForSeat(idx, total) {
-    if (idx === 0) return portrait ? 2.8 : 3.0; // front
+    if (idx === 0) return portrait ? 2.6 : 3.0; // front
     if (portrait) {
-      if (total <= 2) return 2.5;
-      if (total === 3) return 2.3;
-      if (total === 4) return 2.0;
-      if (total === 5) return 1.8;
-      return 1.6; // 6+
+      if (total <= 2) return 2.2;
+      if (total === 3) return 2.0;
+      if (total === 4) return 1.7;
+      if (total === 5) return 1.5;
+      return 1.4; // 6+
     } else {
       return 3; // landscape unchanged
     }
@@ -5114,9 +5144,20 @@ function assignSeats() {
   // Index 0 in the angles array corresponds to the front; map local-player-index there.
   for (let i = 0; i < n; i++) {
     const a = angles[i];
-    // Tight ring — sprites sit right at the table edge
-    const ringRx = T.rx + (portrait ? 6 : 8);
-    const ringRy = T.ry + (portrait ? 10 : 14);
+    // Tight ring — sprites sit right at the table edge.
+    // In portrait we cap the horizontal ring so back-row sprites + names
+    // always have safe-area padding from the canvas edges, and we expand
+    // ringRy a touch so the topmost seat doesn't hug the back wall.
+    let ringRx, ringRy;
+    if (portrait) {
+      // Reserve ~14px for half a name label on each side.
+      const maxRx = Math.max(40, (SCENE.W / 2) - 14);
+      ringRx = Math.min(T.rx + 4, maxRx);
+      ringRy = T.ry + 12;
+    } else {
+      ringRx = T.rx + 8;
+      ringRy = T.ry + 14;
+    }
     const x = T.cx + Math.cos(a) * ringRx;
     const y = T.cy + Math.sin(a) * ringRy;
     // Compute which player object this seat is for — front (i=0) goes to local player online.
@@ -8420,28 +8461,65 @@ document.getElementById('btn-gauntlet').onclick = () => {
   GAUNTLET.showSetupForGauntlet();
 };
 
-// Fullscreen toggle (always-visible button on title; reuses native API).
+// ---- Fullscreen helpers (with iOS Safari/Chrome fallback) ----
+// iOS Safari / iOS Chrome don't support the Fullscreen API on
+// arbitrary elements (only <video>). When the native API is unavailable
+// we apply a CSS "immersive" mode that fills the viewport, scrolls the
+// URL bar away, and locks scroll so the experience feels fullscreen.
+window.FS = (function () {
+  const docEl = document.documentElement;
+  const nativeSupported = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+  function isFakeFs() { return document.body.classList.contains('fake-fs'); }
+  function isFs() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement) || isFakeFs();
+  }
+  function enterFake() {
+    document.body.classList.add('fake-fs');
+    // Nudge URL bar away on iOS Safari.
+    setTimeout(() => { try { window.scrollTo(0, 1); } catch (e) {} }, 50);
+    fireSync();
+  }
+  function exitFake() {
+    document.body.classList.remove('fake-fs');
+    fireSync();
+  }
+  function enter() {
+    if (docEl.requestFullscreen) {
+      docEl.requestFullscreen({ navigationUI: 'hide' }).catch(() => enterFake());
+    } else if (docEl.webkitRequestFullscreen) {
+      try { docEl.webkitRequestFullscreen(); }
+      catch (e) { enterFake(); }
+    } else {
+      enterFake();
+    }
+  }
+  function exit() {
+    if (isFakeFs()) { exitFake(); return; }
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+  function toggle() { if (isFs()) exit(); else enter(); }
+  const _listeners = [];
+  function onChange(fn) { _listeners.push(fn); }
+  function fireSync() { _listeners.forEach(f => { try { f(); } catch (e) {} }); }
+  document.addEventListener('fullscreenchange', fireSync);
+  document.addEventListener('webkitfullscreenchange', fireSync);
+  return { enter, exit, toggle, isFs, onChange, nativeSupported };
+})();
+
+// Fullscreen toggle (always-visible button on title).
 (function wireFullscreen() {
   const btn = document.getElementById('btn-fullscreen');
   if (!btn) return;
-  function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
   btn.addEventListener('click', () => {
     AUDIO.init(); AUDIO.blip(660, 0.05);
-    const docEl = document.documentElement;
-    if (!isFs()) {
-      if (docEl.requestFullscreen) docEl.requestFullscreen({ navigationUI: 'hide' }).catch(()=>{});
-      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
-      else { showToast('Fullscreen not supported on this browser'); }
-    } else {
-      if (document.exitFullscreen) document.exitFullscreen();
-      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    }
+    FS.toggle();
   });
   function syncIcon() {
-    btn.textContent = isFs() ? '⛚ EXIT FULLSCREEN' : '⛶ FULLSCREEN';
+    btn.textContent = FS.isFs() ? '⛚ EXIT FULLSCREEN' : '⛶ FULLSCREEN';
   }
-  document.addEventListener('fullscreenchange', syncIcon);
-  document.addEventListener('webkitfullscreenchange', syncIcon);
+  FS.onChange(syncIcon);
+  syncIcon();
 })();
 
 // Patch showGameOverUI to route to the gauntlet flow when active.
@@ -8840,30 +8918,22 @@ const MOBILE = (() => {
       document.getElementById('audio-toggle').click();
       renderControls();
     });
-    // Fullscreen toggle — uses the standard Fullscreen API (with a -webkit- fallback for iOS).
+    // Fullscreen toggle — uses FS helper which falls back to a CSS-based
+    // "immersive" mode on iOS Safari/Chrome where the Fullscreen API isn't
+    // available on arbitrary elements.
     const fsBtn = document.getElementById('mob-fs-btn');
     if (fsBtn) {
       fsBtn.addEventListener('click', () => {
         vibrate(15);
-        const docEl = document.documentElement;
-        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-        if (!isFs) {
-          if (docEl.requestFullscreen) docEl.requestFullscreen({ navigationUI: 'hide' }).catch(()=>{});
-          else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
-          else { showToast('Fullscreen not supported on this browser'); }
-        } else {
-          if (document.exitFullscreen) document.exitFullscreen();
-          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-        }
+        FS.toggle();
       });
-      // Keep the icon in sync with current state (⛶ exit-fullscreen, ⛚ enter-fullscreen)
       function updateFsIcon() {
-        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        const isFs = FS.isFs();
         fsBtn.textContent = isFs ? '⛚' : '⛶';
         fsBtn.title = isFs ? 'Exit fullscreen' : 'Enter fullscreen';
       }
-      document.addEventListener('fullscreenchange', updateFsIcon);
-      document.addEventListener('webkitfullscreenchange', updateFsIcon);
+      FS.onChange(updateFsIcon);
+      updateFsIcon();
     }
     document.getElementById('mob-leave-btn').addEventListener('click', () => {
       vibrate(20);
