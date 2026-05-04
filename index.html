@@ -404,10 +404,13 @@
       background: radial-gradient(ellipse at center top, #1a1208 0%, #000 70%);
       padding: 0;
     }
-    canvas#scene {
+    /* Landscape-only: cap canvas to 16:9 of width.
+       In portrait this rule is replaced by the .mob-canvas-slot canvas#scene
+       block in the portrait media query — see below. */
+    canvas#scene:not(.in-mob-slot) {
       width: 100vw;
       height: auto;
-      max-height: 56.25vw; /* 9/16 ratio fits the canvas to viewport width */
+      max-height: 56.25vw;
       flex-shrink: 0;
     }
     /* HUD reflows from absolute overlay → inline column block under the canvas. */
@@ -939,10 +942,11 @@
      into a portrait viewport without distortion. */
   .mob-canvas-slot {
     width: 100vw;
-    /* Slot matches canvas's 9:16 portrait aspect so canvas fills with no letterbox.
-       Capped at 78vh so the bid controls + hand stay above the fold on tall phones. */
-    aspect-ratio: 9 / 16;
-    max-height: 78vh;
+    /* Flex-grows to fill remaining vertical space inside #mobile-view; the
+       canvas (270x480 internal) letterboxes itself with object-fit: contain.
+       min-height keeps the scene readable when controls are tall. */
+    flex: 1 1 auto;
+    min-height: 30vh;
     background: #000;
     border-bottom: 3px solid #6a4020;
     box-shadow: inset 0 -2px 8px rgba(0,0,0,0.8);
@@ -951,12 +955,12 @@
     display: none;
   }
   body.in-game .mob-canvas-slot { display: block; }
-  /* Canvas is 270x480 (portrait, 9:16). With matching slot aspect, contain
-     fills exactly with negligible letterbox (only when max-height kicks in). */
-  .mob-canvas-slot canvas {
+  .mob-canvas-slot canvas#scene {
     display: block;
     width: 100% !important;
     height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
     object-fit: contain;
     object-position: center;
     image-rendering: pixelated;
@@ -1291,7 +1295,23 @@
       ) !important;
     }
     /* Show the mobile UI when in-game on portrait */
-    body.in-game #mobile-view { display: flex; flex-direction: column; min-height: 100vh; background: #0a0604; }
+    body.in-game #mobile-view {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh; /* dynamic viewport — accounts for iOS Safari URL bar */
+      min-height: 0;
+      background: #0a0604;
+      overflow: hidden;
+    }
+    body.in-game #mobile-view > .mob-header,
+    body.in-game #mobile-view > .mob-status,
+    body.in-game #mobile-view > .mob-bid-display,
+    body.in-game #mobile-view > .mob-players,
+    body.in-game #mobile-view > .mob-hand-section,
+    body.in-game #mobile-view > .mob-controls,
+    body.in-game #mobile-view > .mob-log { flex: 0 0 auto; }
+    body.in-game #mobile-view > .mob-canvas-slot { flex: 1 1 auto; min-height: 25vh; }
     /* Lobby + title + menu still work — they're already mostly HTML — but tighten them. */
     #title-screen h1 { font-size: clamp(36px, 12vw, 56px); }
     #title-screen .title-stack { padding: 6vh 6vw; }
@@ -2890,9 +2910,26 @@ const SCENE = (() => {
   const rain = [];
   function rebuildRain() {
     rain.length = 0;
-    for (let i = 0; i < 60; i++) rain.push({ x: Math.random()*W, y: Math.random()*H, s: 1+Math.random()*1.5 });
+    // Three layered bands: distant fine drizzle, mid drops, close fat drops
+    for (let i = 0; i < 70; i++) {
+      const layer = Math.random();
+      let band;
+      if (layer < 0.45) band = 0;       // distant
+      else if (layer < 0.85) band = 1;  // mid
+      else band = 2;                     // close fat
+      rain.push({
+        x: Math.random()*W,
+        y: Math.random()*H,
+        s: band === 0 ? 0.5 + Math.random()*0.5 : (band === 1 ? 1 + Math.random() : 1.8 + Math.random()*1.2),
+        spd: band === 0 ? 80 + Math.random()*30 : (band === 1 ? 130 + Math.random()*40 : 180 + Math.random()*50),
+        wind: 0.35 + Math.random()*0.3,  // per-drop wind susceptibility
+        alpha: band === 0 ? 0.35 + Math.random()*0.2 : (band === 1 ? 0.55 + Math.random()*0.2 : 0.75 + Math.random()*0.15),
+        band,
+      });
+    }
   }
   rebuildRain();
+  const splashes = [];
   let krakenT = 0, lightningT = 0, lightningNext = 4 + Math.random()*8, elapsed = 0;
   function flash() { lightningT = 0.6; return true; }
 
@@ -2904,21 +2941,21 @@ const SCENE = (() => {
     const isPortrait = H > W;
     if (isPortrait) {
       LAYOUT = {
-        skyEnd: Math.round(H * 0.14),         // ~67px on 480 portrait
-        wallStart: Math.round(H * 0.14),
-        wallEnd: Math.round(H * 0.40),         // before table starts
-        tableY: Math.round(H * 0.55),          // mid-screen
+        skyEnd: Math.round(H * 0.16),
+        wallStart: Math.round(H * 0.16),
+        wallEnd: Math.round(H * 0.34),
+        tableY: Math.round(H * 0.62),
         floorStart: Math.round(H * 0.95),
-        lanternX: Math.round(W * 0.18),
-        lanternY: Math.round(H * 0.06),
-        oceanY: Math.round(H * 0.10),
+        lanternX: Math.round(W / 2),
+        lanternY: Math.round(H * 0.18),
+        oceanY: Math.round(H * 0.11),
         krakenCount: 2,
         krakenSpacing: Math.round(W / 3),
       };
       TABLE.cx = W/2;
-      TABLE.cy = Math.round(H * 0.55);
-      TABLE.rx = Math.round(W * 0.40);
-      TABLE.ry = Math.round(H * 0.28);
+      TABLE.cy = Math.round(H * 0.62);
+      TABLE.rx = Math.round(W * 0.38);
+      TABLE.ry = Math.round(H * 0.22);
     } else {
       LAYOUT = {
         skyEnd: 60,
@@ -2949,7 +2986,7 @@ const SCENE = (() => {
     lightningNext -= dt;
     if (lightningNext <= 0) {
       flash();
-      lightningNext = 5 + Math.random()*10;
+      lightningNext = 18 + Math.random()*22;
       // Soft electric crackle synced to the visual flash, then a delayed
       // distant thunder rumble for natural separation (light ↔ sound delay).
       if (window.AUDIO) {
@@ -2958,17 +2995,36 @@ const SCENE = (() => {
       }
     }
     const skyEnd = LAYOUT.skyEnd;
-    // Sky
+    // Sky — dark stormy
     const skyGrad = ctx.createLinearGradient(0,0,0,skyEnd);
-    skyGrad.addColorStop(0, '#070712');
-    skyGrad.addColorStop(1, '#141428');
+    skyGrad.addColorStop(0, '#030308');
+    skyGrad.addColorStop(0.5, '#0a0a18');
+    skyGrad.addColorStop(1, '#101020');
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0,0,W,skyEnd);
-    // Distant raging ocean
+    // Roiling storm clouds
+    ctx.fillStyle = `rgba(30,25,50,0.7)`;
+    for (let i = 0; i < 8; i++) {
+      const cWx = ((i*137 + elapsed*12)%(W+60)) - 30;
+      const cWy = 6 + (i*11)%((skyEnd*0.4)|0);
+      ctx.fillRect(cWx|0, cWy|0, 40 + (i*17)%30, 3 + (i%3));
+    }
+    ctx.fillStyle = `rgba(20,18,40,0.5)`;
+    for (let i = 0; i < 5; i++) {
+      const cWx = ((i*193 + elapsed*8)%(W+40)) - 20;
+      const cWy = 2 + (i*19)%(((skyEnd*0.35)|0) || 1);
+      ctx.fillRect(cWx|0, cWy|0, 55 + (i*13)%25, 4);
+    }
+    // Raging ocean — taller, choppier waves
     for (let x = 0; x < W; x += 2) {
-      const wave = Math.sin(x*0.06 + krakenT*1.2)*2 + Math.sin(x*0.13 + krakenT*0.7)*1.5;
+      const wave = Math.sin(x*0.06 + krakenT*1.8)*4 + Math.sin(x*0.13 + krakenT*1.2)*3 + Math.sin(x*0.25 + krakenT*2.5)*1.5;
       ctx.fillStyle = '#0a1424';
       ctx.fillRect(x, LAYOUT.oceanY + wave, 2, (skyEnd - LAYOUT.oceanY) - wave);
+      // White foam caps
+      if (Math.sin(x*0.08 + krakenT*1.5) > 0.7) {
+        ctx.fillStyle = 'rgba(180,200,220,0.3)';
+        ctx.fillRect(x, LAYOUT.oceanY + wave - 1, 2, 1);
+      }
     }
     // Kraken tentacle silhouettes
     for (let i = 0; i < LAYOUT.krakenCount; i++) {
@@ -2994,13 +3050,56 @@ const SCENE = (() => {
         }
       }
     }
-    // Rain inside window slit
-    ctx.fillStyle = '#a0b0c0';
+    // Wind gust factor — slow undulation + occasional violent gust
+    const baseGust = 1 + Math.sin(elapsed*0.4)*0.35 + Math.sin(elapsed*1.3)*0.15;
+    const violentGust = Math.max(0, Math.sin(elapsed*0.18 + 1.7) - 0.55) * 4;
+    const gust = baseGust + violentGust;
+    // Heavy rain inside window slit — varied drops, layered, wind-driven
     for (let p of rain) {
-      p.y += 90*dt; p.x -= 30*dt;
-      if (p.y > skyEnd) { p.y = -2; p.x = Math.random()*W; }
+      p.y += p.spd * dt;
+      p.x -= 60 * gust * p.wind * dt;
+      if (p.y > skyEnd) {
+        // Splash on sill
+        if (p.band === 2 && Math.random() < 0.5) {
+          splashes.push({ x: p.x, y: skyEnd-2, life: 0.25, age: 0 });
+        }
+        p.y = -2 - Math.random()*8;
+        p.x = Math.random()*W;
+      }
       if (p.x < 0) p.x += W;
-      if (p.y < skyEnd) ctx.fillRect(p.x|0, p.y|0, 1, 2 + (p.s|0));
+      if (p.y < skyEnd) {
+        const len = 2 + (p.s*2)|0;
+        ctx.fillStyle = `rgba(180,200,220,${p.alpha})`;
+        // Slight diagonal streak for closer drops
+        if (p.band === 2) {
+          for (let k = 0; k < len; k++) {
+            ctx.fillRect((p.x - k*0.4)|0, (p.y + k)|0, 1, 1);
+          }
+        } else {
+          ctx.fillRect(p.x|0, p.y|0, 1, len);
+        }
+      }
+    }
+    // Splash particles on the sill
+    for (let i = splashes.length - 1; i >= 0; i--) {
+      const s = splashes[i];
+      s.age += dt;
+      if (s.age >= s.life) { splashes.splice(i, 1); continue; }
+      const a = 0.6 * (1 - s.age/s.life);
+      ctx.fillStyle = `rgba(200,220,235,${a})`;
+      const r = (s.age/s.life) * 4;
+      ctx.fillRect((s.x - r)|0, s.y|0, 1, 1);
+      ctx.fillRect((s.x + r)|0, s.y|0, 1, 1);
+      ctx.fillRect((s.x - r*0.5)|0, (s.y - 1)|0, 1, 1);
+      ctx.fillRect((s.x + r*0.5)|0, (s.y - 1)|0, 1, 1);
+    }
+    // Occasional translucent rain sheet sweeping across during heavy gust
+    if (violentGust > 0.3) {
+      const sweepX = ((elapsed*220) % (W + 200)) - 100;
+      ctx.fillStyle = `rgba(160,180,210,${0.04 + violentGust*0.05})`;
+      ctx.fillRect(sweepX, 0, 80, skyEnd);
+      ctx.fillStyle = `rgba(180,200,220,${0.03 + violentGust*0.04})`;
+      ctx.fillRect(sweepX + 90, 0, 60, skyEnd);
     }
     // Window frame
     ctx.fillStyle = '#3a2410';
@@ -3015,6 +3114,7 @@ const SCENE = (() => {
   }
 
   function drawCabinWall() {
+    const portrait = H > W;
     // Wall above table
     const wallStart = LAYOUT.wallStart;
     const wallEnd = LAYOUT.wallEnd;
@@ -3026,12 +3126,77 @@ const SCENE = (() => {
     }
     ctx.fillStyle = '#1a1004';
     for (let px = 0; px < W; px += 40) ctx.fillRect(px, wallStart, 1, wallEnd - wallStart);
-    // Foreground floor
-    const floorStart = LAYOUT.floorStart;
-    ctx.fillStyle = '#1a0c04';
-    ctx.fillRect(0, floorStart, W, H - floorStart);
-    ctx.fillStyle = '#0a0402';
-    ctx.fillRect(0, floorStart, W, 2);
+
+    if (portrait) {
+      // Grimy ship's deck — fills from the wall seam down to the canvas bottom
+      // so the table doesn't float over a black void. Wide horizontal planks
+      // with cracks, grime, and rusty bolts so the floor reads as flooring.
+      const deckTop = wallEnd;
+      const deckBot = H;
+      // Base — dark stained wood
+      const deckGrad = ctx.createLinearGradient(0, deckTop, 0, deckBot);
+      deckGrad.addColorStop(0, '#0a0604');     // shadowed near the wall
+      deckGrad.addColorStop(0.5, '#1a0e06');   // mid
+      deckGrad.addColorStop(1, '#28160a');     // slightly lit at the very front
+      ctx.fillStyle = deckGrad;
+      ctx.fillRect(0, deckTop, W, deckBot - deckTop);
+      // Plank seams running horizontally — wider planks toward camera (mock perspective)
+      ctx.fillStyle = '#000';
+      const plankRows = 5;
+      for (let i = 1; i <= plankRows; i++) {
+        const t = i / plankRows;
+        const y = deckTop + Math.round((deckBot - deckTop) * t * t);
+        ctx.fillRect(0, y, W, 1);
+        ctx.fillStyle = '#3a200c';
+        ctx.fillRect(0, y - 1, W, 1);
+        ctx.fillStyle = '#000';
+      }
+      // Vertical seams every plank — slightly offset per row for staggered planks
+      ctx.fillStyle = '#080402';
+      for (let i = 0; i <= 6; i++) {
+        const x = Math.round(W * (i / 6) + (i % 2) * 8);
+        ctx.fillRect(x, deckTop, 1, deckBot - deckTop);
+      }
+      // Rusty bolts at plank intersections (sparse, sized for portrait)
+      ctx.fillStyle = '#3a2010';
+      const seed = (n) => { let x = Math.sin(n*1234.5)*9999; return x - Math.floor(x); };
+      for (let i = 0; i < 12; i++) {
+        const bx = Math.round(seed(i) * W);
+        const by = deckTop + 4 + Math.round(seed(i+50) * (deckBot - deckTop - 8));
+        ctx.fillRect(bx, by, 2, 2);
+        ctx.fillStyle = '#1a0a04';
+        ctx.fillRect(bx, by+1, 1, 1);
+        ctx.fillStyle = '#3a2010';
+      }
+      // Grime smears + water stains
+      ctx.fillStyle = 'rgba(20,30,12,0.35)';
+      for (let i = 0; i < 6; i++) {
+        const sx = Math.round(seed(i+200) * (W - 30));
+        const sy = deckTop + 6 + Math.round(seed(i+250) * (deckBot - deckTop - 12));
+        ctx.fillRect(sx, sy, 14 + (i*7)%14, 2);
+        ctx.fillRect(sx+3, sy+1, 18 + (i*5)%10, 1);
+      }
+      // Heavy table shadow on the deck under the table footprint
+      const tShadowGrad = ctx.createRadialGradient(TABLE.cx, TABLE.cy + TABLE.ry + 6, 6,
+                                                    TABLE.cx, TABLE.cy + TABLE.ry + 6, TABLE.rx + 18);
+      tShadowGrad.addColorStop(0, 'rgba(0,0,0,0.85)');
+      tShadowGrad.addColorStop(0.6, 'rgba(0,0,0,0.45)');
+      tShadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = tShadowGrad;
+      ctx.fillRect(0, TABLE.cy, W, deckBot - TABLE.cy);
+      // Wall→deck baseboard seam — a thicker dark line where wall meets deck
+      ctx.fillStyle = '#040200';
+      ctx.fillRect(0, deckTop, W, 2);
+      ctx.fillStyle = '#3a2008';
+      ctx.fillRect(0, deckTop + 2, W, 1);
+    } else {
+      // Landscape — original simple foreground floor strip
+      const floorStart = LAYOUT.floorStart;
+      ctx.fillStyle = '#1a0c04';
+      ctx.fillRect(0, floorStart, W, H - floorStart);
+      ctx.fillStyle = '#0a0402';
+      ctx.fillRect(0, floorStart, W, 2);
+    }
   }
 
   // Static atmosphere on the wall
@@ -3164,10 +3329,11 @@ const SCENE = (() => {
 
   function drawTable() {
     const {cx, cy, rx, ry} = TABLE;
-    // -- 1. Soft floor shadow under table
+    const portrait = H > W;
+    // -- 1. Soft floor shadow under table — tighter & more focused on portrait
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.beginPath();
-    ctx.ellipse(cx, cy + ry + 10, rx + 18, ry*0.55, 0, 0, Math.PI*2);
+    ctx.ellipse(cx, cy + ry + (portrait ? 6 : 10), rx + (portrait ? 6 : 18), ry*(portrait ? 0.35 : 0.55), 0, 0, Math.PI*2);
     ctx.fill();
     // -- 2. Front skirt (the visible front face of the table)
     // Dark mossy base
@@ -3407,10 +3573,24 @@ const SCENE = (() => {
     { x: 422, baseY: 64,  kind: 'hooded',   w: 58, h: 140, eyeY: 90,  eyeColor: '#ff5020', dir: -1, phase: 0.7 },
   ];
 
+  // Portrait CREW — only 2 silhouettes flanking the cabin, well away from
+  // the back-center player seat. Recomputed each frame so dynamic resize works.
+  function getPortraitCrew() {
+    const wallTop = LAYOUT.wallStart + 4;
+    const wallBottom = LAYOUT.wallEnd;
+    const h = Math.min(80, Math.max(40, wallBottom - wallTop - 6));
+    return [
+      // Far-left tentacle-faced — only torso visible at canvas edge
+      { x: -10,    baseY: wallTop + 4, kind: 'tentacle', w: 30, h: h, eyeY: wallTop + 22, eyeColor: '#80ffe0', dir: 1,  phase: 0.0, scale: 0.7 },
+      // Far-right hooded — same treatment
+      { x: W - 20, baseY: wallTop + 4, kind: 'hooded',   w: 30, h: h, eyeY: wallTop + 22, eyeColor: '#ff5020', dir: -1, phase: 0.7, scale: 0.7 },
+    ];
+  }
   function drawCrew(t) {
     const reactT = (window.state && window.state.crewReact) || 0;
     const gaspT = (window.state && window.state.crewGasp) || 0;
-    for (const c of CREW) {
+    const crewList = (H > W) ? getPortraitCrew() : CREW;
+    for (const c of crewList) {
       const bob = Math.sin(t*1.0 + c.phase)*1.5 + Math.sin(t*0.4 + c.phase)*0.8;
       const gaspY = -gaspT * 5;
       const lean = c.dir * reactT * 6;
@@ -3597,19 +3777,25 @@ const SCENE = (() => {
     ctx.fillRect(lx, 0, 1, ly);
     ctx.fillStyle = '#3a2410';
     ctx.fillRect(lx-5+sway, ly, 11, 2);
-    ctx.fillStyle = '#f4d27a';
+    // Seaweed green glass panes
+    ctx.fillStyle = '#6aad5a';
     ctx.fillRect(lx-4+sway, ly+2, 9, 8);
-    ctx.fillStyle = '#ff8030';
+    ctx.fillStyle = '#3a8030';
     ctx.fillRect(lx-3+sway, ly+3, 7, 6);
-    ctx.fillStyle = '#fff8c0';
+    ctx.fillStyle = '#c0f0a0';
     ctx.fillRect(lx-1+sway, ly+5, 3, 3);
     ctx.fillStyle = '#3a2410';
     ctx.fillRect(lx-5+sway, ly+10, 11, 2);
-    // Glow
-    const glow = ctx.createRadialGradient(lx+sway, ly+6, 4, lx+sway, ly+6, 100*flicker);
-    glow.addColorStop(0, `rgba(255,180,80,${0.5*flicker})`);
-    glow.addColorStop(0.4, `rgba(255,140,50,${0.18*flicker})`);
-    glow.addColorStop(1, 'rgba(255,140,50,0)');
+    // Seaweed green glow — smaller and dimmer in portrait so it doesn't wash
+    // out the back-row player sitting directly under the centered lantern.
+    const portrait = H > W;
+    const haloR = (portrait ? 48 : 100) * flicker;
+    const haloA0 = (portrait ? 0.30 : 0.5) * flicker;
+    const haloA1 = (portrait ? 0.10 : 0.18) * flicker;
+    const glow = ctx.createRadialGradient(lx+sway, ly+6, 4, lx+sway, ly+6, haloR);
+    glow.addColorStop(0, `rgba(80,180,60,${haloA0})`);
+    glow.addColorStop(0.4, `rgba(50,140,40,${haloA1})`);
+    glow.addColorStop(1, 'rgba(50,140,40,0)');
     ctx.fillStyle = glow;
     ctx.fillRect(0,0,W,H);
     if (Math.random() < 0.15) {
@@ -3619,9 +3805,50 @@ const SCENE = (() => {
         vx: (Math.random()-0.5)*4,
         vy: 6 + Math.random()*8,
         life: 1.0 + Math.random()*0.8, age: 0,
-        color: '#ffa040', kind: 'ember',
+        color: '#60c040', kind: 'ember',
       });
     }
+  }
+
+  // Animated smoke wisps drifting through the cabin
+  const smokeWisps = [];
+  for (let i = 0; i < 14; i++) {
+    smokeWisps.push({
+      x: Math.random() * 800,
+      y: 50 + Math.random() * 120,
+      len: 60 + Math.random() * 80,
+      thickness: 2 + Math.random() * 3,
+      speed: 8 + Math.random() * 12,
+      waveAmp: 1.5 + Math.random() * 3,
+      waveFreq: 0.8 + Math.random() * 1.2,
+      phase: Math.random() * Math.PI * 2,
+      alpha: 0.06 + Math.random() * 0.10,
+    });
+  }
+  function drawSmoke(t) {
+    for (const s of smokeWisps) {
+      s.x += s.speed * (1/60);
+      if (s.x > W + 40) { s.x = -s.len - 20; s.y = 40 + Math.random() * 140; }
+      const waveY = Math.sin(t * s.waveFreq + s.phase) * s.waveAmp;
+      ctx.fillStyle = `rgba(140,160,130,${s.alpha})`;
+      for (let seg = 0; seg < s.len; seg += 4) {
+        const segWave = Math.sin(t * s.waveFreq + s.phase + seg * 0.04) * s.waveAmp;
+        const fade = 1 - Math.abs(seg / s.len - 0.5) * 1.4;
+        if (fade <= 0) continue;
+        ctx.globalAlpha = fade;
+        ctx.fillRect((s.x + seg)|0, (s.y + segWave + waveY)|0, 5, s.thickness|0);
+      }
+      // Secondary wisp layer offset slightly
+      ctx.fillStyle = `rgba(120,140,110,${s.alpha * 0.6})`;
+      for (let seg = 0; seg < s.len * 0.7; seg += 5) {
+        const segWave = Math.sin(t * s.waveFreq * 0.7 + s.phase + 1 + seg * 0.05) * s.waveAmp * 1.3;
+        const fade = 1 - Math.abs(seg / (s.len * 0.7) - 0.5) * 1.6;
+        if (fade <= 0) continue;
+        ctx.globalAlpha = fade;
+        ctx.fillRect((s.x + seg + 8)|0, (s.y + segWave + waveY - 3)|0, 4, (s.thickness * 0.7)|0);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   function drawScene(dt) {
@@ -3823,21 +4050,22 @@ const SCENE = (() => {
     const wantPortrait = (mode === 'portrait');
     const isPortrait = canvas.height > canvas.width;
     if (wantPortrait === isPortrait) return; // already in target mode
-    if (wantPortrait) {
-      canvas.width = 270;
-      canvas.height = 480;
-    } else {
-      canvas.width = 480;
-      canvas.height = 270;
-    }
+    if (wantPortrait) setSize(270, 480);
+    else setSize(480, 270);
+  }
+  // Set arbitrary canvas dimensions and refresh all dependent state.
+  // Used by MOBILE to size the portrait canvas to match its slot's aspect
+  // ratio, so the rendered scene fills the slot edge-to-edge with no bars.
+  function setSize(w, h) {
+    if (canvas.width === w && canvas.height === h) return;
+    canvas.width = w;
+    canvas.height = h;
     W = canvas.width;
     H = canvas.height;
     ctx.imageSmoothingEnabled = false;
     recomputeLayout();
     rebuildRain();
-    // Repopulate atmospherics anchored to W/H
     rebuildAtmospherics();
-    // Tell the game to redo seat positions for the new TABLE
     if (window.assignSeats && window.state && window.state.players && window.state.players.length) {
       try { assignSeats(); } catch (e) {}
     }
@@ -3896,7 +4124,7 @@ const SCENE = (() => {
     ctx,
     get W() { return W; },
     get H() { return H; },
-    drawScene, drawTitle, flash, TABLE, setOrientation, LAYOUT: () => LAYOUT,
+    drawScene, drawTitle, flash, TABLE, setOrientation, setSize, LAYOUT: () => LAYOUT,
     setGauntletAtmosphere, getGauntletRound,
   };
 })();
@@ -4786,6 +5014,7 @@ function assignSeats() {
   const T = SCENE.TABLE;
   const all = state.players;
   const n = all.length;
+  const portrait = SCENE.H > SCENE.W;
   // Player[0] sits at front (closest to camera). Everyone else spreads across the back arc.
   // Front angle = +PI/2 (bottom of ellipse). Back center = -PI/2 (top).
   const angles = [Math.PI/2];
@@ -4793,11 +5022,40 @@ function assignSeats() {
   if (back === 1) {
     angles.push(-Math.PI/2);
   } else if (back > 1) {
-    const spread = Math.PI * 0.85; // ~150° arc across the back
+    // Spread tuned per player count: more back-row players need a wider arc
+    // but never wide enough that seats land beside the front player.
+    let spread;
+    if (portrait) {
+      // back=1→PI*0 (single seat opposite), back=2→PI*0.6, …, capped at PI*0.95
+      spread = Math.min(Math.PI * 0.95, Math.PI * (0.4 + 0.18 * back));
+    } else {
+      spread = Math.PI * 0.85;
+    }
     for (let i = 0; i < back; i++) {
       const t = i / (back - 1);
       angles.push(-Math.PI/2 - spread/2 + t*spread);
     }
+  }
+
+  // Per-player-count sprite scales tuned for portrait + landscape. Front
+  // sprite is always largest; back row scales with available room.
+  function scaleForSeat(idx, total) {
+    if (idx === 0) return portrait ? 2.8 : 3.0; // front
+    if (portrait) {
+      if (total <= 2) return 2.5;
+      if (total === 3) return 2.3;
+      if (total === 4) return 2.0;
+      if (total === 5) return 1.8;
+      return 1.6; // 6+
+    } else {
+      return 3; // landscape unchanged
+    }
+  }
+  // Cup scale — kept clearly smaller than the player sprite so the cup
+  // never visually dominates a back-row character.
+  function cupScaleForSeat(seatScale) {
+    if (!portrait) return 1; // landscape unchanged
+    return Math.max(0.45, Math.min(0.85, seatScale * 0.30));
   }
 
   // In online play, each device shows its own player at the front. Locally,
@@ -4812,8 +5070,8 @@ function assignSeats() {
   for (let i = 0; i < n; i++) {
     const a = angles[i];
     // Tight ring — sprites sit right at the table edge
-    const ringRx = T.rx + 8;
-    const ringRy = T.ry + 14;
+    const ringRx = T.rx + (portrait ? 6 : 8);
+    const ringRy = T.ry + (portrait ? 10 : 14);
     const x = T.cx + Math.cos(a) * ringRx;
     const y = T.cy + Math.sin(a) * ringRy;
     // Compute which player object this seat is for — front (i=0) goes to local player online.
@@ -4821,14 +5079,21 @@ function assignSeats() {
       ? (i === 0 ? all[localPlayerIdx] : all[(localPlayerIdx + i) % n])
       : all[i];
     const isFront = (i === 0) && (!isHotseat ? !playerForSeat.isAI : true);
+    const sc = scaleForSeat(i, n);
+    const cs = cupScaleForSeat(sc);
+    // Cup top width = 30 * cs, height = 30 * cs. Center on the seat's table-edge spot.
+    const cupHalfW = 15 * cs;
+    const cupHalfH = 11 * cs;
     playerForSeat.seat = {
       x: Math.round(x),
       y: Math.round(y),
       angle: a,
       side: isFront ? 'front' : 'back',
+      scale: sc,
+      cupScale: cs,
       // Cups sit on the table edge inside the player's seat (between seat and center)
-      cupX: Math.round(T.cx + Math.cos(a) * (T.rx - 18) - 14),
-      cupY: Math.round(T.cy + Math.sin(a) * (T.ry - 10) - 11),
+      cupX: Math.round(T.cx + Math.cos(a) * (T.rx - 18) - cupHalfW),
+      cupY: Math.round(T.cy + Math.sin(a) * (T.ry - 10) - cupHalfH),
     };
   }
 }
@@ -5240,19 +5505,23 @@ function drawPlayers(dt) {
       ctx.fillRect(s.x - 50, s.y - 50, 100, 70);
     }
     drawSpriteAt(ctx, p.sprite, sx, sy, spriteSize);
-    // Name above sprite
+    // Name above sprite — clamp x so the centered label stays inside the canvas
     ctx.fillStyle = isCurrent ? '#f4d27a' : (p.alive ? '#a88860' : '#6a3030');
     ctx.font = '7px "Press Start 2P"';
     ctx.textAlign = 'center';
-    ctx.fillText(p.name, s.x, sy - 8);
-    // Dice-count dots
+    const nameW = ctx.measureText(p.name).width;
+    const padX = 4;
+    const labelX = Math.max(nameW/2 + padX, Math.min(SCENE.W - nameW/2 - padX, s.x));
+    ctx.fillText(p.name, labelX, sy - 8);
+    // Dice-count dots — clamp the row inside the canvas as well
     const dots = 5;
-    const startDx = s.x - (dots * 4)/2;
+    const dotsW = dots * 4;
+    const dotsX = Math.max(padX, Math.min(SCENE.W - dotsW - padX, s.x - dotsW/2));
     for (let i = 0; i < dots; i++) {
       ctx.fillStyle = i < p.dice.length
         ? (isCurrent ? '#f4d27a' : '#c89860')
         : '#3a2410';
-      ctx.fillRect(startDx + i*4, sy - 4, 3, 3);
+      ctx.fillRect(dotsX + i*4, sy - 4, 3, 3);
     }
     ctx.textAlign = 'left';
     ctx.globalAlpha = 1;
@@ -5271,16 +5540,17 @@ function drawPlayers(dt) {
     const shakeY = sh > 0 ? (Math.random()-0.5)*2 : 0;
     if (!p.alive) ctx.globalAlpha = 0.25;
     const cupTipped = (state.phase === 'reveal');
+    const cupScale = p.seat.cupScale != null ? p.seat.cupScale : 1;
     if (cupTipped) {
       drawTippedCup(ctx, p.seat.cupX + shakeX, p.seat.cupY + shakeY + 4, p.seat.angle);
     } else {
-      drawCup(ctx, p.seat.cupX + shakeX, p.seat.cupY + shakeY, false, null, 1);
+      drawCup(ctx, p.seat.cupX + shakeX, p.seat.cupY + shakeY, false, null, cupScale);
     }
     ctx.globalAlpha = 1;
   }
 
   // 1. Back-row sprites (big, looming behind the table)
-  for (const p of backRow) drawPlayer(p, 3);
+  for (const p of backRow) drawPlayer(p, p.seat.scale != null ? p.seat.scale : 3);
   // 2. Cups for back-row (sit on the table top, near each back seat)
   for (const p of backRow) drawCupFor(p);
 
@@ -5291,7 +5561,7 @@ function drawPlayers(dt) {
   drawCenterPanel();
 
   // 5. Front player sprite — drawn AFTER center panel so the player is in the foreground
-  for (const p of frontRow) drawPlayer(p, 3);
+  for (const p of frontRow) drawPlayer(p, p.seat.scale != null ? p.seat.scale : 3);
   // 6. Front cup
   for (const p of frontRow) drawCupFor(p);
 
@@ -6995,7 +7265,7 @@ const GAUNTLET = (() => {
     cx.fillStyle = plankShadow;
     for (let x = 80; x < W; x += 90) cx.fillRect(x, 0, 1, H);
 
-    // Porthole on right side — circular window showing weather
+    // Porthole on right side — circular window showing a RAGING STORM
     const pX = W - 110, pY = 100, pR = 60;
     // Porthole frame (brass)
     cx.fillStyle = '#604030';
@@ -7004,58 +7274,84 @@ const GAUNTLET = (() => {
     drawCircle(cx, pX, pY, pR+3);
     cx.fillStyle = '#604030';
     drawCircle(cx, pX, pY, pR);
-    // Porthole inner — sky + sea
+    // Porthole inner — raging storm sky + sea
     cx.save();
     cx.beginPath();
     cx.arc(pX, pY, pR-2, 0, Math.PI*2);
     cx.clip();
-    // Sky
+    // Storm sky — dark, near-black with bruised purple/blue
     const grad = cx.createLinearGradient(0, pY-pR, 0, pY+pR);
-    grad.addColorStop(0, t.sky);
-    grad.addColorStop(0.6, t.skyMid);
-    grad.addColorStop(1, t.sea);
+    grad.addColorStop(0, '#050510');
+    grad.addColorStop(0.5, '#0c0c20');
+    grad.addColorStop(1, '#0a1828');
     cx.fillStyle = grad;
     cx.fillRect(pX-pR, pY-pR, pR*2, pR*2);
-    // Horizon line + waves
+    // Horizon line + churning sea
     const horizonY = pY + pR*0.4;
-    cx.fillStyle = t.sea;
+    cx.fillStyle = '#040a14';
     cx.fillRect(pX-pR, horizonY, pR*2, pR);
-    // Wave caps
-    cx.fillStyle = t.wave;
-    for (let wy = 0; wy < pR*0.6; wy += 4) {
-      for (let wx = -pR; wx < pR; wx += 6) {
-        const phase = Math.sin((wx+wy)*0.4) > 0;
-        if (phase) cx.fillRect(pX+wx, horizonY+wy+(wx%3), 4, 1);
+    // Big wave caps + foam
+    cx.fillStyle = '#1a3048';
+    for (let wy = 0; wy < pR*0.6; wy += 3) {
+      for (let wx = -pR; wx < pR; wx += 5) {
+        const wave = Math.sin((wx+wy)*0.5) * 2 + Math.sin(wx*0.3)*1.5;
+        if (Math.sin((wx+wy)*0.4) > 0) {
+          cx.fillRect(pX+wx, horizonY+wy+wave, 5, 1);
+        }
       }
     }
-    // Rain streaks
-    if (t.rainAlpha > 0.3) {
-      cx.fillStyle = `rgba(180,200,220,${t.rainAlpha*0.6})`;
-      for (let i = 0; i < 30*t.rainAlpha; i++) {
-        const rx = pX-pR + Math.random()*pR*2;
-        const ry = pY-pR + Math.random()*pR*2;
-        cx.fillRect(rx|0, ry|0, 1, 4);
+    // White foam streaks
+    cx.fillStyle = 'rgba(180,200,220,0.5)';
+    for (let i = 0; i < 12; i++) {
+      const fx = pX-pR + Math.random()*pR*2;
+      const fy = horizonY + Math.random()*pR*0.5;
+      cx.fillRect(fx|0, fy|0, 6, 1);
+    }
+    // HEAVY driving rain — sideways streaks
+    cx.fillStyle = 'rgba(180,200,220,0.7)';
+    for (let i = 0; i < 70; i++) {
+      const rx = pX-pR + Math.random()*pR*2;
+      const ry = pY-pR + Math.random()*pR*2;
+      cx.fillRect(rx|0, ry|0, 1, 5);
+      cx.fillRect((rx-1)|0, (ry+5)|0, 1, 1);
+    }
+    // Multiple jagged lightning bolts
+    for (let lb = 0; lb < 2; lb++) {
+      if (Math.random() < 0.85) {
+        cx.fillStyle = 'rgba(230,235,255,0.95)';
+        let bx = pX + (Math.random()-0.5)*pR*1.4;
+        let by = pY - pR*0.85;
+        while (by < horizonY) {
+          cx.fillRect(bx, by, 2, 5);
+          bx += (Math.random()-0.5)*10;
+          by += 4;
+          // Occasional fork
+          if (Math.random() < 0.15) {
+            let fx = bx, fy = by;
+            for (let f = 0; f < 4; f++) {
+              cx.fillRect(fx, fy, 1, 3);
+              fx += (Math.random()-0.5)*6;
+              fy += 3;
+            }
+          }
+        }
+        // Bright flash glow around bolt
+        cx.fillStyle = 'rgba(180,200,255,0.18)';
+        cx.fillRect(pX-pR, pY-pR, pR*2, pR*1.4);
       }
     }
-    // Distant lightning bolt (R4-R5)
-    if (t.lightning && Math.random() < 0.6) {
-      cx.fillStyle = 'rgba(220,230,255,0.8)';
-      let bx = pX + (Math.random()-0.3)*pR;
-      let by = pY - pR*0.7;
-      while (by < horizonY) {
-        cx.fillRect(bx, by, 2, 5);
-        bx += (Math.random()-0.5)*8;
-        by += 5;
-      }
+    // Heavy roiling cloud bank
+    cx.fillStyle = 'rgba(15,15,28,0.85)';
+    for (let i = 0; i < 8; i++) {
+      const cWx = pX-pR + Math.random()*pR*2;
+      const cWy = pY-pR + Math.random()*pR*0.6;
+      cx.fillRect(cWx, cWy, 28+Math.random()*22, 5);
     }
-    // Cloud band
-    if (t.cloud > 0.3) {
-      cx.fillStyle = `rgba(40,40,60,${t.cloud*0.6})`;
-      for (let i = 0; i < 4; i++) {
-        const cWx = pX-pR + Math.random()*pR*2;
-        const cWy = pY-pR*0.7 + Math.random()*pR*0.4;
-        cx.fillRect(cWx, cWy, 22+Math.random()*18, 4);
-      }
+    cx.fillStyle = 'rgba(35,30,55,0.6)';
+    for (let i = 0; i < 6; i++) {
+      const cWx = pX-pR + Math.random()*pR*2;
+      const cWy = pY-pR*0.85 + Math.random()*pR*0.5;
+      cx.fillRect(cWx, cWy, 32+Math.random()*18, 4);
     }
     cx.restore();
     // Porthole rivets
@@ -7081,9 +7377,9 @@ const GAUNTLET = (() => {
     cx.fillRect(lX-12, lY, 24, 4);    // top cap
     cx.fillStyle = '#604030';
     cx.fillRect(lX-10, lY+4, 20, 26); // body cage (darker tone)
-    // Glass panes — dimmer glow
-    const lanternBrightness = 0.45 * t.lantern;  // halved from 0.7
-    cx.fillStyle = `rgba(255,160,60,${lanternBrightness})`;
+    // Glass panes — seaweed green glow
+    const lanternBrightness = 0.45 * t.lantern;
+    cx.fillStyle = `rgba(80,180,60,${lanternBrightness})`;
     cx.fillRect(lX-8, lY+6, 16, 22);
     // Cage bars (vertical)
     cx.fillStyle = '#1a1208';
@@ -7091,25 +7387,24 @@ const GAUNTLET = (() => {
     // Bottom cap (rusted)
     cx.fillStyle = '#2a1808';
     cx.fillRect(lX-12, lY+30, 24, 4);
-    // Glow halo — dimmer
+    // Glow halo — seaweed green
     const haloR = 50 * t.lantern;
     const haloG = cx.createRadialGradient(lX, lY+18, 0, lX, lY+18, haloR);
-    haloG.addColorStop(0, `rgba(255,160,60,${0.22*t.lantern})`);
-    haloG.addColorStop(1, 'rgba(255,160,60,0)');
+    haloG.addColorStop(0, `rgba(80,180,60,${0.22*t.lantern})`);
+    haloG.addColorStop(1, 'rgba(80,180,60,0)');
     cx.fillStyle = haloG;
     cx.fillRect(lX-haloR, lY-haloR, haloR*2, haloR*2);
 
-    // SMOKE wafting through the room — multiple layered drift bands
-    // Use round number to seed deterministic smoke positions per round.
+    // SMOKE wafting through the room — green-tinted from seaweed lantern
     const smokeAlpha = 0.18 + round*0.04;
-    cx.fillStyle = `rgba(180,180,170,${smokeAlpha})`;
+    cx.fillStyle = `rgba(140,170,130,${smokeAlpha})`;
     for (let i = 0; i < 8; i++) {
       const sWx = ((i*157 + round*39) % W);
       const sWy = ((i*89 + 30 + round*47) % (H-50));
       const sLen = 90 + (i*17)%70;
       cx.fillRect(sWx, sWy, sLen, 4);
     }
-    cx.fillStyle = `rgba(150,150,140,${smokeAlpha*0.85})`;
+    cx.fillStyle = `rgba(120,150,110,${smokeAlpha*0.85})`;
     for (let i = 0; i < 6; i++) {
       const sWx = ((i*191 + round*53) % W);
       const sWy = ((i*73 + 60 + round*61) % (H-30));
@@ -7118,7 +7413,7 @@ const GAUNTLET = (() => {
       cx.fillRect(sWx+8, sWy-2, sLen-16, 2);
     }
     // Lantern smoke trail (rising from the lantern)
-    cx.fillStyle = `rgba(160,150,140,${smokeAlpha})`;
+    cx.fillStyle = `rgba(130,160,120,${smokeAlpha})`;
     for (let i = 0; i < 4; i++) {
       const offset = i*3;
       cx.fillRect(lX-3+offset, lY-30+i*8, 8, 3);
@@ -8154,18 +8449,32 @@ const MOBILE = (() => {
     const slot = document.getElementById('mob-canvas-slot');
     const desktopParent = document.getElementById('app');
     if (!canvas || !slot || !desktopParent) return;
-    // Switch canvas internal dimensions to portrait (270x480) on mobile portrait
-    // so the table renders as a vertical oval with players around it. Switch
-    // back to landscape (480x270) otherwise.
     const wantPortraitCanvas = isMobilePortrait();
-    if (wantPortraitCanvas) SCENE.setOrientation('portrait');
-    else SCENE.setOrientation('landscape');
-    // Position canvas in the right DOM container
-    const wantMobileSlot = isMobilePortrait() && document.body.classList.contains('in-game');
+    const wantMobileSlot = wantPortraitCanvas && document.body.classList.contains('in-game');
+    // Position canvas in the right DOM container BEFORE sizing so layout is correct
     if (wantMobileSlot && canvas.parentElement !== slot) {
       slot.appendChild(canvas);
     } else if (!wantMobileSlot && canvas.parentElement !== desktopParent) {
       desktopParent.appendChild(canvas);
+    }
+    canvas.classList.toggle('in-mob-slot', canvas.parentElement === slot);
+    // Size the canvas backing buffer.
+    if (wantMobileSlot) {
+      // Match the slot's actual aspect ratio so the scene fills edge-to-edge
+      // (no letterbox bars). Fixed virtual width keeps pixel-art density;
+      // height scales to match the slot's aspect.
+      const rect = slot.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const W = 270;
+        const H = Math.max(160, Math.round(W * rect.height / rect.width));
+        SCENE.setSize(W, H);
+      } else {
+        SCENE.setOrientation('portrait');
+      }
+    } else if (wantPortraitCanvas) {
+      SCENE.setOrientation('portrait');
+    } else {
+      SCENE.setOrientation('landscape');
     }
   }
 
