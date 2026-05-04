@@ -1335,6 +1335,51 @@
     #menu { padding: 4vh 4vw; }
     .player-input { width: 100%; box-sizing: border-box; min-height: 52px; font-size: 14px; }
   }
+
+  /* Compact mobile portrait controls — kicks in below 420px so the bid row
+     stays on one line and the canvas slot keeps its vertical footprint. */
+  @media (max-width: 420px) and (orientation: portrait) {
+    .mob-hand-section { padding: 8px 10px; }
+    .mob-hand-label { margin-bottom: 5px; font-size: 8px; }
+    .mob-hand-dice { gap: 5px; }
+    .mob-hand-dice canvas { width: 36px; height: 36px; }
+    .mob-controls { padding: 10px; }
+    .mob-bid-row { gap: 5px; margin-bottom: 10px; flex-wrap: nowrap; }
+    .mob-bid-label { font-size: 10px; margin-right: 0; }
+    .mob-bid-row .mob-stepper { padding: 2px; gap: 2px; }
+    .mob-bid-row .mob-stepper button { width: 30px; height: 30px; font-size: 14px; }
+    .mob-bid-row .mob-stepper-value { min-width: 24px; font-size: 14px; }
+    .mob-bid-row .mob-stepper canvas { width: 26px; height: 26px; }
+    .mob-bid-x-label { font-size: 11px; }
+    .mob-action-row { gap: 8px; }
+    .mob-action-row button { padding: 10px 8px; font-size: 11px; min-height: 44px; }
+    .mob-status { padding: 8px 12px; font-size: 10px; }
+  }
+
+  /* Extra-tight on very small phones (under 380px wide) */
+  @media (max-width: 380px) and (orientation: portrait) {
+    .mob-hand-dice canvas { width: 32px; height: 32px; }
+    .mob-bid-row .mob-stepper button { width: 26px; height: 26px; font-size: 12px; }
+    .mob-bid-row .mob-stepper canvas { width: 22px; height: 22px; }
+    .mob-bid-row .mob-stepper-value { min-width: 20px; font-size: 12px; }
+    .mob-title { font-size: 10px; letter-spacing: 1px; }
+    .mob-round-info { font-size: 7px; letter-spacing: 1px; margin-top: 2px; }
+    .mob-icon-btn { width: 38px; height: 38px; font-size: 12px; }
+  }
+
+  /* Short-viewport compaction — kicks in under 700px tall regardless of width.
+     Aggressively shrinks vertical UI so the canvas slot retains breathing room. */
+  @media (max-height: 700px) and (orientation: portrait) {
+    .mob-header { padding: 4px 8px; }
+    .mob-status { padding: 6px 10px; font-size: 9px; }
+    .mob-hand-section { padding: 6px 8px; }
+    .mob-hand-label { margin-bottom: 4px; font-size: 8px; }
+    .mob-hand-dice canvas { width: 30px; height: 30px; }
+    .mob-controls { padding: 8px; }
+    .mob-bid-row { margin-bottom: 8px; }
+    .mob-action-row button { padding: 8px 6px; font-size: 10px; min-height: 38px; }
+    body.in-game #mobile-view > .mob-canvas-slot { min-height: 42vh; }
+  }
 </style>
 </head>
 <body>
