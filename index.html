@@ -593,75 +593,134 @@
       transform: translate(-50%, 0);
     }
 
-    /* === Cutscene (mobile portrait) — Persona/Pokemon-style ===
-       The painted bg canvas (drawQuartersBg) uses fixed pixel offsets
-       designed for 1280x720 landscape; on portrait its elements clump
-       in the upper band and look broken. Hide it and use a CSS
-       atmospheric backdrop. Speaker badges are compact, dialogue is
-       the focal point. */
-    #gnt-cutscene .gnt-bg-canvas { display: none !important; }
-    /* !important needed because the unconditional `#gnt-cutscene { background: none; }`
-       rule below in source order would otherwise win cascade tie. */
+    /* === Cutscene (mobile portrait) — gloomy "Davy Jones's locker" ===
+       Big spotlit portraits stacked vertically: Davy looms at the top,
+       chosen captain stands closer to mid/bottom. The atmospheric locker
+       backdrop (kraken silhouettes, god-rays, drifting silt) is painted
+       onto .gnt-bg-canvas via drawProgressionBg() in JS — matches the
+       R1-of-5 progression screen's mood. No "VS" — the menace is the focal
+       point, not arena framing. Names are full-width so they never clip. */
+    #gnt-cutscene .gnt-bg-canvas {
+      display: block !important;
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      max-width: none !important;
+      max-height: none !important;
+      z-index: 0;
+      object-fit: cover;
+      pointer-events: none;
+    }
+    /* Keep .gnt-overlay's fixed/inset:0 positioning so the cutscene fills
+       the whole viewport (otherwise the menu underneath leaks through at
+       the bottom). Just override layout flow + a fallback dark backdrop. */
     #gnt-cutscene {
       padding: 0 !important;
-      background:
-        radial-gradient(ellipse at 50% 18%, rgba(120,60,30,0.35) 0%, rgba(0,0,0,0) 55%),
-        radial-gradient(ellipse at 50% 90%, rgba(60,20,10,0.40) 0%, rgba(0,0,0,0) 60%),
-        linear-gradient(to bottom, #1a0e04 0%, #0a0602 50%, #050200 100%),
-        repeating-linear-gradient(0deg, rgba(0,0,0,0.35) 0 4px, transparent 4px 8px) !important;
       flex-direction: column !important;
       align-items: stretch !important;
-      justify-content: flex-start !important;
-      overflow-y: auto !important;
+      justify-content: space-between !important;
+      overflow: hidden !important;
+      background:
+        radial-gradient(ellipse 70% 30% at 50% 18%, rgba(120,60,30,0.18) 0%, rgba(0,0,0,0) 60%),
+        radial-gradient(ellipse 70% 30% at 50% 80%, rgba(20,40,30,0.20) 0%, rgba(0,0,0,0) 60%),
+        linear-gradient(to bottom, #060c10 0%, #02040a 50%, #000204 100%) !important;
     }
+    /* Hide the VS element entirely on mobile — gone, not just dimmed. */
+    #gnt-cutscene .gnt-cut-vs { display: none !important; }
+    /* Stack portraits vertically: Davy top, player below. Each gets its
+       own band so spotlights don't fight. Both are huge. */
     #gnt-cutscene .gnt-cut-row {
-      display: grid !important;
-      grid-template-columns: auto 1fr auto;
-      grid-template-areas: "davy vs player";
+      display: flex !important;
+      flex-direction: column !important;
       align-items: center;
-      gap: 8px;
+      justify-content: flex-start;
+      gap: 0 !important;
       margin: 0 !important;
-      padding: max(2vh, env(safe-area-inset-top, 0px)) 4vw 0 4vw;
+      padding: 0 !important;
       width: 100%;
-      flex: 0 0 auto !important;
-      align-self: flex-start !important;
+      flex: 1 1 auto !important;
+      position: relative;
+      z-index: 1;
     }
-    #gnt-cut-davy-wrap   { grid-area: davy; }
-    #gnt-cutscene .gnt-cut-vs { grid-area: vs; justify-self: center; }
-    #gnt-cut-player-wrap { grid-area: player; }
-    .gnt-cut-portrait { gap: 4px; }
+    #gnt-cut-davy-wrap, #gnt-cut-player-wrap {
+      display: flex !important;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6em;
+      width: 100%;
+      flex: 1 1 0;
+      padding: max(2vh, env(safe-area-inset-top, 0px)) 4vw 0 4vw;
+      position: relative;
+    }
+    /* Davy's spotlight — warm orange/amber halo from above */
+    #gnt-cut-davy-wrap::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 70% 65% at 50% 35%, rgba(255,160,60,0.18) 0%, rgba(0,0,0,0) 60%);
+      pointer-events: none;
+    }
+    /* Player's spotlight — cool ghostly blue/green from above */
+    #gnt-cut-player-wrap::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 70% 65% at 50% 35%, rgba(120,200,200,0.16) 0%, rgba(0,0,0,0) 60%);
+      pointer-events: none;
+    }
+    /* Portrait canvases dominate. Big, crisp, sitting on a pedestal frame. */
+    .gnt-cut-portrait { gap: 0.6em; align-items: center; }
     .gnt-cut-portrait canvas {
-      width: clamp(56px, 18vw, 88px) !important;
-      height: clamp(56px, 18vw, 88px) !important;
-      border: 3px solid #6a4020;
-      box-shadow: 0 0 0 2px #2a0808, 0 0 14px rgba(255,140,40,0.18);
+      width: clamp(180px, 55vw, 280px) !important;
+      height: clamp(180px, 55vw, 280px) !important;
+      border: 4px solid #6a4020;
+      box-shadow:
+        0 0 0 3px #1a0a04,
+        0 0 28px rgba(255,140,40,0.28),
+        0 8px 18px rgba(0,0,0,0.7);
       background: #0a0604;
+      image-rendering: pixelated;
     }
+    /* Player gets cyan-tinted frame to match its spotlight */
+    #gnt-cut-player-wrap .gnt-cut-portrait canvas {
+      border-color: #406878;
+      box-shadow:
+        0 0 0 3px #04141a,
+        0 0 28px rgba(120,200,200,0.30),
+        0 8px 18px rgba(0,0,0,0.7);
+    }
+    /* Names: full-width, never truncated, big and readable */
     .gnt-cut-pname {
-      font-size: 8px;
-      max-width: 32vw;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      font-size: clamp(13px, 3.6vw, 18px) !important;
+      max-width: 92vw !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: normal !important;
+      letter-spacing: 3px;
+      text-align: center;
+      text-shadow: 2px 2px 0 #1a0604, 0 0 12px rgba(255,140,40,0.4);
     }
-    #gnt-cutscene .gnt-cut-vs {
-      font-size: clamp(20px, 6vw, 32px);
-      letter-spacing: 4px;
-      transition: opacity 0.25s ease;
-    }
-    #gnt-cutscene[data-speaker="davy"]   #gnt-cut-player-wrap { opacity: 0.35; filter: grayscale(0.6); }
-    #gnt-cutscene[data-speaker="player"] #gnt-cut-davy-wrap   { opacity: 0.35; filter: grayscale(0.6); }
-    #gnt-cutscene[data-line-idx]:not([data-line-idx="0"]) .gnt-cut-vs { opacity: 0.25; }
+    #gnt-cut-davy-wrap   .gnt-cut-pname { color: #f48030; }
+    #gnt-cut-player-wrap .gnt-cut-pname { color: #b0d8d8; text-shadow: 2px 2px 0 #04141a, 0 0 12px rgba(120,200,200,0.4); }
+    /* Active speaker pops; the other dims — same Persona-style focus */
+    #gnt-cutscene[data-speaker="davy"]   #gnt-cut-player-wrap { opacity: 0.40; filter: grayscale(0.55); }
+    #gnt-cutscene[data-speaker="player"] #gnt-cut-davy-wrap   { opacity: 0.40; filter: grayscale(0.55); }
+    /* Dialogue box pinned to the bottom over the portraits */
     #gnt-cutscene .gnt-dialogue {
       position: relative;
       left: auto; right: auto; bottom: auto;
-      margin: auto 4vw calc(3vh + env(safe-area-inset-bottom, 0px)) 4vw;
+      margin: 0 4vw calc(3vh + env(safe-area-inset-bottom, 0px)) 4vw;
       padding: 1.1em 1em 0.9em 1em;
-      min-height: 32vh;
+      min-height: 26vh;
       max-width: none;
       display: flex;
       flex-direction: column;
       gap: 0.7em;
+      z-index: 2;
+      flex: 0 0 auto;
     }
     #gnt-cutscene .gnt-dialogue-speaker { font-size: 11px; }
     #gnt-cutscene .gnt-dialogue-text {
@@ -3160,22 +3219,27 @@ const SCENE = (() => {
         krakenSpacing: Math.round(W / 3),
       };
     } else {
+      // Landscape: derive everything from W/H fractions matching the original
+      // 480x270 design (skyEnd 60 ≈ H*0.222, wallEnd 130 ≈ H*0.481, etc.).
+      // This way the cinematic landscape look adapts cleanly to any canvas
+      // aspect — including the slot-aspect-matched dims used on mobile so
+      // the scene fills the slot edge-to-edge with no letterbox bars.
       LAYOUT = {
-        skyEnd: 60,
-        wallStart: 66,
-        wallEnd: 130,
-        tableY: 165,
-        floorStart: 230,
-        lanternX: 60,
-        lanternY: 20,
-        oceanY: 42,
+        skyEnd:    Math.round(H * 0.222),
+        wallStart: Math.round(H * 0.244),
+        wallEnd:   Math.round(H * 0.481),
+        tableY:    Math.round(H * 0.611),
+        floorStart:Math.round(H * 0.852),
+        lanternX:  Math.round(W * 0.125),
+        lanternY:  Math.round(H * 0.074),
+        oceanY:    Math.round(H * 0.156),
         krakenCount: 3,
-        krakenSpacing: 150,
+        krakenSpacing: Math.round(W / 3.2),
       };
       TABLE.cx = W/2;
-      TABLE.cy = 175;
-      TABLE.rx = 175;
-      TABLE.ry = 50;
+      TABLE.cy = Math.round(H * 0.648);
+      TABLE.rx = Math.round(W * 0.365);
+      TABLE.ry = Math.round(H * 0.185);
     }
   }
 
@@ -3192,7 +3256,7 @@ const SCENE = (() => {
       lightningNext = 18 + Math.random()*22;
       // Soft electric crackle synced to the visual flash, then a delayed
       // distant thunder rumble for natural separation (light ↔ sound delay).
-      if (window.AUDIO) {
+      if (typeof AUDIO !== 'undefined') {
         AUDIO.lightningCrack();
         setTimeout(() => AUDIO.thunder(), 280 + Math.random()*200);
       }
@@ -4080,7 +4144,7 @@ const SCENE = (() => {
       flash();
       lightningNext = 3 + Math.random()*5;
       // Crack first (with the flash), thunder rumbles in afterwards
-      if (window.AUDIO) {
+      if (typeof AUDIO !== 'undefined') {
         AUDIO.lightningCrack();
         setTimeout(() => AUDIO.thunder(), 320 + Math.random()*240);
       }
@@ -5180,7 +5244,7 @@ function aiDecide(player) {
   // Davy R5 "tell-reading": when the player just bid as a bluff, Davy is
   // more likely to call. Boost his effective call threshold for this turn.
   let effectiveCallThreshold = player.ai.callTreshold;
-  if (player.id === 'davy' && window.GAUNTLET && GAUNTLET.getDavyBluffBoost) {
+  if (player.id === 'davy' && typeof GAUNTLET !== 'undefined' && GAUNTLET.getDavyBluffBoost) {
     effectiveCallThreshold += GAUNTLET.getDavyBluffBoost();
   }
   if (probTrue < effectiveCallThreshold) return { type: 'liar' };
@@ -5590,7 +5654,7 @@ function callLiar() {
   SCENE.flash();
   setTimeout(() => SCENE.flash(), 220);
   // Layered electric crackles to match the double-flash drama of a LIAR call
-  if (window.AUDIO) {
+  if (typeof AUDIO !== 'undefined') {
     AUDIO.lightningCrack();
     setTimeout(() => AUDIO.lightningCrack(), 220);
   }
@@ -5603,7 +5667,7 @@ function callLiar() {
   const loser = bidderTruthful ? caller : bidder;
   // Gauntlet: track whether the human just bluffed (for Davy R5 tells).
   try {
-    if (window.GAUNTLET && GAUNTLET.recordBluffOutcome) {
+    if (typeof GAUNTLET !== 'undefined' && GAUNTLET.recordBluffOutcome) {
       GAUNTLET.recordBluffOutcome(bidder, state.bid, actual);
     }
   } catch(e){}
@@ -5746,7 +5810,7 @@ function doAITurn() {
   const decision = aiDecide(p);
   // Gauntlet R5: Davy talks trash mid-match.
   try {
-    if (window.GAUNTLET && GAUNTLET.maybeFireDavyTaunt) {
+    if (typeof GAUNTLET !== 'undefined' && GAUNTLET.maybeFireDavyTaunt) {
       GAUNTLET.maybeFireDavyTaunt(p, decision);
     }
   } catch(e){}
@@ -6432,8 +6496,20 @@ function setupMenu() {
     }
   };
   document.getElementById('btn-back').onclick = () => { AUDIO.blip(330, 0.05); showTitle(); };
-  document.getElementById('btn-start').onclick = () => {
+  bindStandardStartHandler();
+  applyMode('solo');
+}
+
+// Standard SET SAIL handler — extracted so showSetup() can re-bind it after
+// mid-flow handlers (multi-pick, gauntlet, online JOIN picker) have replaced
+// btn-start.onclick. Always checks the gauntlet pendingStart flag first so
+// the GAUNTLET button continues to work across multiple play sessions.
+function bindStandardStartHandler() {
+  const btn = document.getElementById('btn-start');
+  if (!btn) return;
+  btn.onclick = () => {
     AUDIO.init();
+    if (typeof GAUNTLET !== 'undefined' && GAUNTLET.tryStartFromSetup && GAUNTLET.tryStartFromSetup()) return;
     if (state.mode === 'solo') {
       startGameSolo(document.getElementById('player-name').value, [...selectedAIs], selectedAvatar);
     } else {
@@ -6441,7 +6517,6 @@ function setupMenu() {
       startCharPicking([...selectedAIs]);
     }
   };
-  applyMode('solo');
 }
 
 function showGameOverUI(winner) {
@@ -6458,6 +6533,22 @@ function showGameOverUI(winner) {
 function hideGameOverUI() { document.getElementById('gameover-overlay').classList.add('hidden'); }
 function resetForNewGame() {
   hideGameOverUI();
+  // If we were in an online game, drop the peer connection cleanly. Without
+  // this, PLAY AGAIN after an online match would leave state.netMode as
+  // 'host'/'client' and the next "solo" match would still try to broadcast
+  // to peers / route bids through the dead NET layer.
+  if (state.netMode === 'host' || state.netMode === 'client') {
+    try { if (typeof NET !== 'undefined' && NET.leave) NET.leave(); } catch(e){}
+    if (typeof ONLINE !== 'undefined') {
+      ONLINE.mode = null;
+      ONLINE.roomCode = null;
+      if (ONLINE.players && ONLINE.players.clear) ONLINE.players.clear();
+      if (ONLINE.selectedAIs && ONLINE.selectedAIs.clear) ONLINE.selectedAIs.clear();
+      ONLINE.myPlayerId = null;
+    }
+    try { history.replaceState(null, '', location.pathname); } catch(e){}
+  }
+  state.netMode = 'offline';
   state.players = [];
   state.bid = null;
   state.phase = 'menu';
@@ -6492,7 +6583,14 @@ function showSetup() {
   document.getElementById('gameover-overlay').classList.add('hidden');
   document.body.classList.remove('on-title');
   const startBtn = document.getElementById('btn-start');
-  if (startBtn) startBtn.textContent = 'SET SAIL';
+  if (startBtn) {
+    startBtn.textContent = 'SET SAIL';
+    // Re-bind the standard SET SAIL handler. Multi-player char-picking and
+    // gauntlet flows replace btn-start.onclick mid-flow; without restoring
+    // it here, a second visit to setup lands on a stale (often no-op or
+    // pick-advance) handler and SET SAIL appears to do nothing.
+    if (typeof bindStandardStartHandler === 'function') bindStandardStartHandler();
+  }
   applyMode(state.mode);
   const oppSec = document.getElementById('opponent-label').parentElement;
   if (oppSec) oppSec.style.display = '';
@@ -6957,6 +7055,11 @@ async function hostNewGame() {
   NET.on('hello', (data, peerId) => {
     // Client introducing themselves with avatar choice + name
     if (!data || !data.name || !data.avatarId) return;
+    // Game already in progress — late joiners can't be seated mid-match.
+    if (state.appPhase === 'game') {
+      NET.send('kick', { reason: 'Game already in progress — try again next round.' }, peerId);
+      return;
+    }
     // Avatar uniqueness check
     const taken = [...ONLINE.players.values()].some(p => p.avatarId === data.avatarId);
     if (taken) {
@@ -7127,7 +7230,6 @@ function startOnlineGame() {
   if (total < 2 || total > 6) { showToast('NEED 2-6 PLAYERS'); return; }
   // Build players array — host first, then other humans, then AIs
   state.players = [];
-  console.log("I am gay")
   // Host (self)
   const hostAvatar = AVATARS.find(a => a.id === ONLINE.myAvatarId);
   state.players.push({
@@ -7206,6 +7308,14 @@ function viewForClient(targetPeerId) {
       dicePerPlayer: state.reveal.dicePerPlayer,
     } : null,
     yourPlayerId: (state.players.find(p => p.peerId === targetPeerId) || {}).id,
+    // Most-recent log entries so clients can mirror the Ship's Log without
+    // running the host's logEvent calls. Newest-first to match state.log order.
+    log: (state.log || []).slice(0, 12),
+    // Stable signature of the current bid + bidder + round so clients can
+    // detect a *new* bid landing and replay the bid animation/SFX locally.
+    bidSig: state.bid
+      ? state.round + ':' + state.bid.qty + 'x' + state.bid.face + ':' + state.bid.by
+      : null,
   };
 }
 
@@ -7224,6 +7334,17 @@ function broadcastState() {
 //----------------------------------------------------------------
 function applyRemoteState(data) {
   if (!data || !data.players) return;
+  // Snapshot prior state so we can detect transitions and trigger the local
+  // animations / SFX that would have fired had this client been the host.
+  // Without this, clients would see static dice with no shake on roll,
+  // no scatter on LIAR, no flash/shake on slam, no soul-pull on elimination.
+  const prevPhase = state.phase;
+  const prevRound = state.round;
+  const prevAlive = {};
+  if (state.players) for (const p of state.players) prevAlive[p.id] = !!p.alive;
+  const hadReveal = !!state.reveal;
+  const prevBidSig = state._bidSig || null;
+
   state.netMode = 'client';
   state.appPhase = data.appPhase || 'game';
   // Reconstruct players with sprites looked up locally
@@ -7253,9 +7374,16 @@ function applyRemoteState(data) {
     caller: state.players.find(p => p.id === data.reveal.callerId),
     loser: state.players.find(p => p.id === data.reveal.loserId),
     t: 0,
-    scatter: [], // remote doesn't replay scatter; clients see static reveal
+    // Scatter is rebuilt locally below when entering reveal phase so the
+    // dice spill animation plays on clients too.
+    scatter: hadReveal && state.reveal ? state.reveal.scatter : [],
   } : null;
   ONLINE.myPlayerId = data.yourPlayerId || ONLINE.myPlayerId;
+  // Mirror Ship's Log from host (host is source of truth — all bid/liar/elim
+  // log entries fire host-side; without this, client logs would be empty).
+  if (Array.isArray(data.log)) state.log = data.log.slice();
+  // Track the bid signature so we can detect *new* bids and replay effects.
+  state._bidSig = data.bidSig || null;
   // Show game UI
   document.getElementById('online-lobby').classList.add('hidden');
   document.getElementById('title-screen').classList.add('hidden');
@@ -7265,6 +7393,116 @@ function applyRemoteState(data) {
   // Re-assign seats whenever the player roster changes (joins, eliminations) so
   // the local player always sits at the front on this device.
   assignSeats();
+
+  // === ANIMATION REPLAY ON STATE TRANSITIONS ===
+  // These fire host-side inside rollAll/callLiar/resolveLiar; clients only
+  // receive the resulting state, so we replay the matching local effects here.
+  try {
+    // (1) Dice roll: phase entered 'rolling' OR round just advanced.
+    const justRolling = state.phase === 'rolling' && prevPhase !== 'rolling';
+    const newRound = state.round > prevRound;
+    if (justRolling || newRound) {
+      for (const p of state.players) {
+        if (p.alive) state.shake[p.id] = 0.6;
+      }
+      if (typeof AUDIO !== 'undefined' && AUDIO.dice) AUDIO.dice();
+    }
+
+    // (2) Liar called: phase just entered 'reveal'.
+    if (state.phase === 'reveal' && prevPhase !== 'reveal' && state.reveal) {
+      const r = state.reveal;
+      if (typeof AUDIO !== 'undefined') {
+        if (AUDIO.slam) AUDIO.slam();
+        if (AUDIO.heartbeat) { AUDIO.heartbeat(); setTimeout(() => AUDIO.heartbeat(), 1100); }
+        if (AUDIO.tableThump) AUDIO.tableThump();
+        if (AUDIO.lightningCrack) {
+          AUDIO.lightningCrack();
+          setTimeout(() => AUDIO.lightningCrack(), 220);
+        }
+        if (AUDIO.dice) {
+          AUDIO.dice();
+          setTimeout(() => AUDIO.dice(), 250);
+          setTimeout(() => AUDIO.dice(), 500);
+        }
+      }
+      if (r.caller) {
+        state.effects.push({ type: 'liarSlam', name: r.caller.name, t: 0, life: 2.4 });
+        state.effects.push({ type: 'liarPortrait', sprite: r.caller.sprite, name: r.caller.name, t: 0, life: 2.4 });
+      }
+      if (typeof SCENE !== 'undefined' && SCENE.TABLE) {
+        state.effects.push({ type: 'shockwave', fromX: SCENE.TABLE.cx, fromY: SCENE.TABLE.cy, t: 0, life: 0.9 });
+      }
+      state.screenShake = 1.4;
+      state.boatRock = 1.0;
+      state.flashColor = { r: 240, g: 60, b: 30, a: 0.40, t: 0.6 };
+      state.crewGasp = 1.0;
+      state.crewReact = 1.0;
+      if (typeof SCENE !== 'undefined' && SCENE.flash) {
+        SCENE.flash();
+        setTimeout(() => SCENE.flash(), 220);
+      }
+      buildLocalRevealScatter(r);
+    }
+
+    // (2b) New bid landed: bidSig changed and there's an active bid.
+    if (state._bidSig && state._bidSig !== prevBidSig && state.bid) {
+      const bidder = state.players[state.bid.by];
+      if (bidder) {
+        if (typeof AUDIO !== 'undefined' && AUDIO.fanfare) AUDIO.fanfare(state.bid.face);
+        state.screenShake = Math.max(state.screenShake, 0.25);
+        state.flashColor = { r: 255, g: 220, b: 120, a: 0.15, t: 0.25 };
+        state.crewReact = Math.max(state.crewReact, 0.4);
+        const seat = bidder.seat || { x: SCENE.W/2, y: 100 };
+        state.effects.push({
+          type: 'bidCard', qty: state.bid.qty, face: state.bid.face, name: bidder.name,
+          fromX: seat.x, fromY: seat.y - 8,
+          toX: SCENE.W/2, toY: 100,
+          t: 0, life: 1.8,
+        });
+        for (let i = 0; i < 14; i++) {
+          state.particles.push({
+            x: seat.x, y: seat.y - 12,
+            vx: (Math.random()-0.5)*40, vy: -20 - Math.random()*30,
+            life: 0.8 + Math.random()*0.4, age: 0,
+            color: ['#f4d27a','#ffd060','#ffa040','#fff8c0'][Math.floor(Math.random()*4)],
+          });
+        }
+      }
+    }
+
+    // (3) Eliminations: any player went alive→dead since last update.
+    for (const p of state.players) {
+      if (prevAlive[p.id] === true && p.alive === false) {
+        const ls = p.seat || { x: SCENE.W/2, y: 130 };
+        state.effects.push({
+          type: 'soulPull',
+          fromX: ls.x, fromY: ls.y - 10,
+          toX: SCENE.TABLE ? SCENE.TABLE.cx : SCENE.W/2,
+          toY: SCENE.TABLE ? SCENE.TABLE.cy : SCENE.H/2,
+          sprite: p.sprite, name: p.name,
+          t: 0, life: 3.2,
+        });
+        state.screenShake = Math.max(state.screenShake, 0.6);
+        state.boatRock = Math.max(state.boatRock, 0.7);
+        state.flashColor = { r: 80, g: 180, b: 200, a: 0.4, t: 0.7 };
+        if (typeof AUDIO !== 'undefined') {
+          if (AUDIO.loseSting) AUDIO.loseSting();
+          if (AUDIO.wail) AUDIO.wail();
+        }
+        for (let i = 0; i < 30; i++) {
+          state.particles.push({
+            x: ls.x + (Math.random()-0.5)*16, y: ls.y - 10,
+            vx: (Math.random()-0.5)*80, vy: -20 - Math.random()*60,
+            life: 1.2 + Math.random()*0.6, age: 0,
+            color: ['#80c0d0','#a0d0e0','#c0e0f0','#e0f0ff'][Math.floor(Math.random()*4)],
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('animation replay failed:', e);
+  }
+
   // Game-over: surface the winner overlay on the client.
   if (state.phase === 'gameover') {
     const winner = state.alivePlayers()[0];
@@ -7274,6 +7512,53 @@ function applyRemoteState(data) {
   }
   updateBanner();
   updateControls();
+}
+
+// Rebuild the dice scatter trajectory locally on a client when the LIAR
+// reveal arrives — same algorithm as host-side callLiar, just keyed off
+// the now-revealed dicePerPlayer values rather than mutating state.
+function buildLocalRevealScatter(r) {
+  if (!r || !r.dicePerPlayer) return;
+  const T = SCENE.TABLE;
+  const innerRx = T.rx - 28;
+  const innerRy = T.ry - 18;
+  const scatter = [];
+  let pIdx = 0;
+  for (const p of state.players) {
+    if (!p.alive || !p.seat) { pIdx++; continue; }
+    const dice = r.dicePerPlayer[p.id] || p.dice;
+    const cupCenterX = p.seat.cupX + 15;
+    const cupCenterY = p.seat.cupY + 13;
+    for (let di = 0; di < dice.length; di++) {
+      const face = dice[di];
+      const isMatch = (face === r.face) || (r.face !== 1 && face === 1);
+      let tx, ty;
+      for (let tries = 0; tries < 8; tries++) {
+        const rad = Math.sqrt(Math.random());
+        const ang = Math.random() * Math.PI * 2;
+        tx = T.cx + Math.cos(ang) * innerRx * rad;
+        ty = T.cy + Math.sin(ang) * innerRy * rad;
+        let ok = true;
+        for (const s of scatter) {
+          if (Math.hypot(s.toX - tx, s.toY - ty) < 16) { ok = false; break; }
+        }
+        if (ok) break;
+      }
+      const launchT = 0.45 + pIdx*0.07 + di*0.05;
+      scatter.push({
+        playerId: p.id, dieIdx: di, face, isMatch,
+        fromX: cupCenterX, fromY: cupCenterY,
+        toX: tx, toY: ty,
+        rot: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random()-0.5) * 12,
+        launchT,
+        flightDur: 0.55 + Math.random()*0.15,
+      });
+    }
+    pIdx++;
+  }
+  r.scatter = scatter;
+  r.countDisplay = 0;
 }
 
 function applyRemoteEvent(ev) {
@@ -7419,11 +7704,11 @@ const GAUNTLET = (() => {
   }
   // === Audio tier — scale rain/wind/music gain per round ===
   function applyMatchAudioTier(round) {
-    if (!window.AUDIO || !AUDIO.setMatchTier) return;
+    if (typeof AUDIO === 'undefined' || !AUDIO.setMatchTier) return;
     AUDIO.setMatchTier(round);
   }
   function resetMatchAudioTier() {
-    if (!window.AUDIO || !AUDIO.setMatchTier) return;
+    if (typeof AUDIO === 'undefined' || !AUDIO.setMatchTier) return;
     AUDIO.setMatchTier(0);
   }
 
@@ -8011,10 +8296,18 @@ const GAUNTLET = (() => {
     const lines = (GAUNTLET_CUTSCENES[key] || []).slice();
     const charAvatar = getAvatar(G.charId);
     const davy = davyPirate();
-    // Paint Davy's quarters bg with the round-appropriate atmosphere
+    // Paint Davy's quarters bg with the round-appropriate atmosphere.
+    // On mobile portrait, swap to the gloomy "locker" backdrop (matches the
+    // R1-of-5 progression screen) — drawQuartersBg uses landscape-only fixed
+    // offsets that don't compose well in a tall viewport.
     const bg = document.getElementById('gnt-cutscene-bg');
     bg.width = window.innerWidth; bg.height = window.innerHeight;
-    drawQuartersBg(bg, cutsceneRound(key));
+    const isMobilePortrait = window.matchMedia('(max-width: 800px) and (orientation: portrait), (max-width: 500px)').matches;
+    if (isMobilePortrait) {
+      drawProgressionBg(bg, cutsceneRound(key));
+    } else {
+      drawQuartersBg(bg, cutsceneRound(key));
+    }
     // Render Davy portrait with mood for this cutscene (relaxed/uneasy/furious)
     const mood = davyMoodFor(key);
     const dCv = document.getElementById('gnt-cut-davy');
@@ -8693,6 +8986,25 @@ document.getElementById('btn-gauntlet').onclick = () => {
   GAUNTLET.showSetupForGauntlet();
 };
 
+// Clear any leftover gauntlet "pending start" flag whenever the user enters
+// the regular setup, returns to title, or starts play-again. Without this,
+// opening the gauntlet setup → backing out → clicking NEW GAME would still
+// fire a gauntlet on SET SAIL because pendingStart was never cleared.
+(function patchPendingClear() {
+  const clearPending = () => { try { GAUNTLET.state.pendingStart = false; } catch(e){} };
+  const newGameBtn   = document.getElementById('btn-new-game');
+  const backTitleBtn = document.getElementById('btn-back-title');
+  const playAgainBtn = document.getElementById('btn-play-again');
+  for (const el of [newGameBtn, backTitleBtn, playAgainBtn]) {
+    if (!el) continue;
+    const orig = el.onclick;
+    el.onclick = function(e) {
+      clearPending();
+      if (typeof orig === 'function') return orig.call(this, e);
+    };
+  }
+})();
+
 // ---- Fullscreen helpers (with iOS Safari/Chrome fallback) ----
 // iOS Safari / iOS Chrome don't support the Fullscreen API on
 // arbitrary elements (only <video>). When the native API is unavailable
@@ -8819,15 +9131,9 @@ showGameOverUI = function(winner) {
   return _origShowGameOverUI(winner);
 };
 
-// Patch start-button click to route into gauntlet startup when applicable.
-const _btnStart = document.getElementById('btn-start');
-if (_btnStart) {
-  const _origStartHandler = _btnStart.onclick;
-  _btnStart.onclick = function(e) {
-    if (GAUNTLET.tryStartFromSetup()) return;
-    if (typeof _origStartHandler === 'function') return _origStartHandler.call(this, e);
-  };
-}
+// Gauntlet routing is now baked into bindStandardStartHandler() — that
+// function is called from showSetup() every time the menu opens, so the
+// gauntlet check is always active even after mid-flow onclick replacements.
 
 // Hook bluff tracking into the reveal phase. We patch logEvent's reveal path
 // indirectly by wrapping where the bid+count are known. Easiest: hook a
@@ -8867,16 +9173,25 @@ const MOBILE = (() => {
     canvas.classList.toggle('in-mob-slot', canvas.parentElement === slot);
     // Size the canvas backing buffer.
     if (wantMobileSlot) {
-      // Match the slot's actual aspect ratio so the scene fills edge-to-edge
-      // (no letterbox bars). Fixed virtual width keeps pixel-art density;
-      // height scales to match the slot's aspect.
+      // Cinematic landscape feel on phones: match the slot's aspect ratio so
+      // the scene fills edge-to-edge (no left/right black bars), but keep a
+      // generous internal width (480) and clamp aspect to landscape so the
+      // landscape layout — which is now resolution-independent — looks
+      // grounded. Slot taller than square gets canvas at 1:1 (so we never
+      // flip into the portrait branch on phones).
       const rect = slot.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
-        const W = 270;
-        const H = Math.max(160, Math.round(W * rect.height / rect.width));
+        const W = 480;
+        const slotAspect = rect.width / rect.height; // wide => > 1
+        // Cap canvas aspect at slot aspect (so contain fills edge-to-edge),
+        // but don't go more square than 1:1 (keeps the cinematic landscape
+        // composition). On very tall slots we letterbox top/bottom; sides
+        // are always full-bleed.
+        const canvasAspect = Math.max(1.0, slotAspect);
+        const H = Math.round(W / canvasAspect);
         SCENE.setSize(W, H);
       } else {
-        SCENE.setOrientation('portrait');
+        SCENE.setSize(480, 270);
       }
     } else if (wantPortraitCanvas) {
       SCENE.setOrientation('portrait');
