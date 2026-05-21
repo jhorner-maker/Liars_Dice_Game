@@ -3432,7 +3432,7 @@ const SCENE = (() => {
   }
   rebuildRain();
   const splashes = [];
-  let krakenT = 0, lightningT = 0, lightningNext = 4 + Math.random()*8, elapsed = 0;
+  let krakenT = 0, lightningT = 0, lightningNext = 12 + Math.random()*16, elapsed = 0;
   let liarStorm = null;
   function flash() { lightningT = 0.6; return true; }
   function flashLiarStorm(variant='deepSeaGreen') {
@@ -3641,7 +3641,7 @@ const SCENE = (() => {
     lightningNext -= dt;
     if (lightningNext <= 0) {
       flash();
-      lightningNext = 18 + Math.random()*22;
+      lightningNext = 30 + Math.random()*35;
       // Soft electric crackle synced to the visual flash, then a delayed
       // distant thunder rumble for natural separation (light ↔ sound delay).
       if (typeof AUDIO !== 'undefined') {
@@ -4856,7 +4856,7 @@ const SCENE = (() => {
     lightningNext -= dt;
     if (lightningNext <= 0) {
       flash();
-      lightningNext = 3 + Math.random()*5;
+      lightningNext = 12 + Math.random()*16;
       // Crack first (with the flash), thunder rumbles in afterwards
       if (typeof AUDIO !== 'undefined') {
         AUDIO.lightningCrack();
@@ -5066,9 +5066,9 @@ const SCENE = (() => {
   let gntRound = 0;
   function setGauntletAtmosphere(r) {
     gntRound = (r || 0) | 0;
-    // R5: tighten lightning to every 3-8s. R4: every 6-12s.
-    if (gntRound === 5) lightningNext = Math.min(lightningNext, 1 + Math.random()*3);
-    else if (gntRound === 4) lightningNext = Math.min(lightningNext, 3 + Math.random()*5);
+    // R5/R4 keep the storm active, but avoid constant lightning spam.
+    if (gntRound === 5) lightningNext = Math.min(lightningNext, 10 + Math.random()*10);
+    else if (gntRound === 4) lightningNext = Math.min(lightningNext, 14 + Math.random()*12);
   }
   function getGauntletRound() { return gntRound; }
   // Atmosphere tint overlay applied AFTER drawScene per round.
@@ -5117,8 +5117,9 @@ const SCENE = (() => {
 const AUDIO = (() => {
   let ac = null, masterGain, musicGain, rainGain, windGain, ambientGain, sfxGain, reverb;
   let muted = false;
+  let thunderVariant = 0;
   function init() {
-    if (ac) return;
+    if (ac) { resume(); return; }
     ac = new (window.AudioContext || window.webkitAudioContext)();
     masterGain = ac.createGain(); masterGain.gain.value = 0.7;
     masterGain.connect(ac.destination);
@@ -5126,14 +5127,19 @@ const AUDIO = (() => {
     reverb.buffer = makeReverbIR(2.6, 2.4);
     const reverbGain = ac.createGain(); reverbGain.gain.value = 0.35;
     reverb.connect(reverbGain); reverbGain.connect(masterGain);
-    musicGain = ac.createGain(); musicGain.gain.value = 0.16; musicGain.connect(masterGain);
+    musicGain = ac.createGain(); musicGain.gain.value = 0.20; musicGain.connect(masterGain);
     const musicWet = ac.createGain(); musicWet.gain.value = 0.08;
     musicGain.connect(musicWet); musicWet.connect(reverb);
-    rainGain = ac.createGain(); rainGain.gain.value = 0.02975; rainGain.connect(masterGain);
+    rainGain = ac.createGain(); rainGain.gain.value = 0.045; rainGain.connect(masterGain);
     windGain = ac.createGain(); windGain.gain.value = 0.05; windGain.connect(masterGain);
     ambientGain = ac.createGain(); ambientGain.gain.value = 0.5; ambientGain.connect(masterGain);
     sfxGain = ac.createGain(); sfxGain.gain.value = 0.85; sfxGain.connect(masterGain);
     startRain(); startWind(); startCreaks(); startShanty();
+    resume();
+  }
+  function resume() {
+    if (!ac || typeof ac.resume !== 'function' || ac.state === 'running') return;
+    try { ac.resume(); } catch (e) {}
   }
   function makeReverbIR(d, decay) {
     const len = Math.floor(ac.sampleRate * d);
@@ -5148,14 +5154,44 @@ const AUDIO = (() => {
     return buf;
   }
   function startRain() {
-    const bs = ac.sampleRate * 2;
-    const buf = ac.createBuffer(1, bs, ac.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < bs; i++) d[i] = (Math.random()*2-1)*0.6;
-    const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
-    const hp = ac.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1500;
-    const lp = ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=5000;
-    src.connect(hp); hp.connect(lp); lp.connect(rainGain); src.start();
+    const washSeconds = 9;
+    const washBuf = ac.createBuffer(1, ac.sampleRate * washSeconds, ac.sampleRate);
+    const wash = washBuf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < wash.length; i++) {
+      const t = i / ac.sampleRate;
+      last = last * 0.42 + (Math.random()*2-1) * 0.58;
+      const swell = 0.72 + 0.18*Math.sin(t*0.74) + 0.10*Math.sin(t*1.91 + 1.4);
+      wash[i] = last * swell * 0.42;
+    }
+    const washSrc = ac.createBufferSource(); washSrc.buffer = washBuf; washSrc.loop = true;
+    const washHp = ac.createBiquadFilter(); washHp.type='highpass'; washHp.frequency.value=320;
+    const washLp = ac.createBiquadFilter(); washLp.type='lowpass'; washLp.frequency.value=3600;
+    const washGain = ac.createGain(); washGain.gain.value = 1.0;
+    const lfo = ac.createOscillator(); const lfoG = ac.createGain();
+    lfo.type = 'sine'; lfo.frequency.value = 0.07; lfoG.gain.value = 0.16;
+    lfo.connect(lfoG); lfoG.connect(washGain.gain); lfo.start();
+    washSrc.connect(washHp); washHp.connect(washLp); washLp.connect(washGain); washGain.connect(rainGain);
+    washSrc.start();
+
+    const dropSeconds = 6;
+    const dropBuf = ac.createBuffer(1, ac.sampleRate * dropSeconds, ac.sampleRate);
+    const drops = dropBuf.getChannelData(0);
+    const dropCount = Math.floor(dropSeconds * 80);
+    for (let n = 0; n < dropCount; n++) {
+      const start = Math.floor(Math.random() * drops.length);
+      const len = 18 + Math.floor(Math.random()*42);
+      const amp = 0.18 + Math.random()*0.28;
+      for (let k = 0; k < len && start + k < drops.length; k++) {
+        drops[start + k] += (Math.random()*2-1) * amp * Math.pow(1 - k/len, 2.2);
+      }
+    }
+    const dropSrc = ac.createBufferSource(); dropSrc.buffer = dropBuf; dropSrc.loop = true;
+    const dropHp = ac.createBiquadFilter(); dropHp.type='highpass'; dropHp.frequency.value=700;
+    const dropLp = ac.createBiquadFilter(); dropLp.type='lowpass'; dropLp.frequency.value=4800;
+    const dropGain = ac.createGain(); dropGain.gain.value = 0.55;
+    dropSrc.connect(dropHp); dropHp.connect(dropLp); dropLp.connect(dropGain); dropGain.connect(rainGain);
+    dropSrc.start();
   }
   function startWind() {
     const bs = ac.sampleRate * 4;
@@ -5222,10 +5258,10 @@ const AUDIO = (() => {
       ['D4',2],['F4',2],
     ];
     const bass = [
-      ['D2',2],['A2',2],['D2',2],['A2',2],
-      ['G2',2],['A2',2],['D2',2],['F2',2],
-      ['D2',2],['Bb2',2],['F2',2],['F2',2],
-      ['Bb2',2],['F2',2],['G2',2],['A2',2],
+      ['D3',2],['A3',2],['D3',2],['A3',2],
+      ['G3',2],['A3',2],['D3',2],['F3',2],
+      ['D3',2],['Bb3',2],['F3',2],['F3',2],
+      ['Bb3',2],['F3',2],['G3',2],['A3',2],
     ];
     const bpm = 78, beat = 60/bpm;
     function play(t, f, dur, type, vol, wet) {
@@ -5250,7 +5286,7 @@ const AUDIO = (() => {
     }
     function schedAll(t) {
       schedVoice(t, melody, 'triangle', 0.20, 0.04);
-      schedVoice(t, bass, 'sawtooth', 0.11, 0.0);
+      schedVoice(t, bass, 'triangle', 0.045, 0.02);
       const total = melody.reduce((s,[,b])=>s+b,0);
       return t + total*beat;
     }
@@ -5263,59 +5299,113 @@ const AUDIO = (() => {
   }
   function thunder() {
     if (!ac || muted) return;
-    const dur = 2.2 + Math.random()*2.0;
+    const profiles = [
+      {
+        dur: [4.0, 1.8], noiseStep: 0.08, decay: 0.992,
+        rumbles: [[0, 0.9, 42, 150, 34, 1.0], [0.55, 0.48, 36, 105, 30, -0.4], [1.25, 0.28, 32, 78, 26, -1.1]],
+        bodies: [[0.08, 0.82, 75, 520, 3.8], [0.8, 0.46, 65, 360, -0.8]],
+        sub: [42, 26, 0.36, 3.2],
+      },
+      {
+        dur: [3.3, 1.5], noiseStep: 0.10, decay: 0.989,
+        rumbles: [[0, 0.72, 50, 210, 38, 1.0], [0.35, 0.42, 42, 130, 32, -0.2], [1.1, 0.24, 36, 90, 28, -0.9]],
+        bodies: [[0.05, 0.95, 90, 620, 3.0], [0.62, 0.36, 80, 420, -0.7]],
+        sub: [46, 30, 0.28, 2.6],
+      },
+      {
+        dur: [5.2, 2.2], noiseStep: 0.065, decay: 0.994,
+        rumbles: [[0.08, 0.78, 36, 120, 28, 1.0], [0.9, 0.54, 34, 96, 26, -0.3], [2.0, 0.26, 30, 72, 24, -1.5]],
+        bodies: [[0.2, 0.64, 70, 460, 4.4], [1.35, 0.44, 62, 330, -0.6]],
+        sub: [38, 24, 0.42, 4.1],
+      },
+      {
+        dur: [3.7, 1.2], noiseStep: 0.09, decay: 0.991,
+        rumbles: [[0, 0.86, 44, 170, 34, 1.0], [0.75, 0.36, 38, 112, 30, -0.5]],
+        bodies: [[0, 0.88, 85, 540, 3.4], [1.0, 0.40, 72, 380, -0.9]],
+        sub: [44, 28, 0.32, 3.0],
+      },
+      {
+        dur: [4.6, 1.7], noiseStep: 0.075, decay: 0.993,
+        rumbles: [[0.18, 0.68, 40, 135, 30, 1.0], [0.55, 0.58, 36, 115, 28, -0.2], [1.55, 0.22, 32, 74, 24, -1.2]],
+        bodies: [[0.25, 0.78, 78, 500, 3.9], [0.95, 0.52, 68, 350, -0.5]],
+        sub: [40, 25, 0.38, 3.6],
+      },
+      {
+        dur: [3.0, 1.0], noiseStep: 0.11, decay: 0.988,
+        rumbles: [[0, 0.76, 55, 230, 42, 1.0], [0.45, 0.30, 45, 140, 34, -0.4]],
+        bodies: [[0.04, 1.0, 105, 700, 2.6], [0.55, 0.34, 82, 430, -0.6]],
+        sub: [48, 32, 0.24, 2.2],
+      },
+    ];
+    const profile = profiles[thunderVariant % profiles.length];
+    thunderVariant = (thunderVariant + 1) % profiles.length;
+    const dur = profile.dur[0] + Math.random()*profile.dur[1];
     const bs = Math.floor(ac.sampleRate*dur);
     const buf = ac.createBuffer(1, bs, ac.sampleRate);
     const d = buf.getChannelData(0);
     let last = 0;
     for (let i = 0; i < bs; i++) {
-      last = last + (Math.random()*2-1)*0.12;
-      last = Math.max(-1, Math.min(1, last*0.985));
+      last = last + (Math.random()*2-1)*profile.noiseStep;
+      last = Math.max(-1, Math.min(1, last*profile.decay));
       d[i] = last;
     }
     const t0 = ac.currentTime;
-    const src = ac.createBufferSource(); src.buffer = buf;
-    const lp = ac.createBiquadFilter(); lp.type='lowpass';
-    lp.frequency.setValueAtTime(80,t0);
-    lp.frequency.exponentialRampToValueAtTime(320, t0+0.22);
-    lp.frequency.exponentialRampToValueAtTime(60, t0+dur);
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0,t0);
-    g.gain.linearRampToValueAtTime(0.72, t0+0.035);
-    g.gain.exponentialRampToValueAtTime(0.001, t0+dur);
-    src.connect(lp); lp.connect(g); g.connect(masterGain);
-    const w = ac.createGain(); w.gain.value=0.55; g.connect(w); w.connect(reverb);
-    src.start(t0); src.stop(t0+dur);
-  }
-  // Soft electric crackle — the actual lightning sound (different from the
-  // distant thunder rumble). Plays on every flash for tight visual sync.
-  function lightningCrack() {
-    if (!ac || muted) return;
-    const t0 = ac.currentTime;
-    const dur = 0.18 + Math.random()*0.08;
-    // High-frequency white noise burst → bandpass for that "electric" character
-    const bs = Math.max(1, Math.floor(ac.sampleRate*dur));
-    const buf = ac.createBuffer(1, bs, ac.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < bs; i++) d[i] = (Math.random()*2-1) * 0.7;
-    const src = ac.createBufferSource(); src.buffer = buf;
-    const bp = ac.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = 4500 + Math.random()*1500;
-    bp.Q.value = 2.5;
-    const hp = ac.createBiquadFilter();
-    hp.type = 'highpass'; hp.frequency.value = 2000;
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(0.28, t0 + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-    src.connect(hp); hp.connect(bp); bp.connect(g); g.connect(masterGain);
-    // Light reverb tail for atmosphere
-    if (reverb) {
-      const w = ac.createGain(); w.gain.value = 0.35;
-      g.connect(w); w.connect(reverb);
+
+    function rumble(delay, peak, startHz, peakHz, endHz, tail) {
+      const start = t0 + delay;
+      const src = ac.createBufferSource(); src.buffer = buf;
+      const lp = ac.createBiquadFilter(); lp.type='lowpass';
+      lp.frequency.setValueAtTime(startHz, start);
+      lp.frequency.exponentialRampToValueAtTime(peakHz, start + 0.42);
+      lp.frequency.exponentialRampToValueAtTime(endHz, start + tail);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0, start);
+      g.gain.linearRampToValueAtTime(peak, start + 0.12);
+      g.gain.exponentialRampToValueAtTime(0.001, start + tail);
+      src.connect(lp); lp.connect(g); g.connect(masterGain);
+      const w = ac.createGain(); w.gain.value = 0.9; g.connect(w); w.connect(reverb);
+      src.start(start); src.stop(start + tail);
     }
-    src.start(t0); src.stop(t0 + dur + 0.02);
+
+    function rollingBody(delay, peak, lowHz, highHz, tail) {
+      const start = t0 + delay;
+      const src = ac.createBufferSource(); src.buffer = buf;
+      const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = lowHz;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(highHz, start);
+      lp.frequency.exponentialRampToValueAtTime(highHz * 0.55, start + tail);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0, start);
+      g.gain.linearRampToValueAtTime(peak, start + 0.22);
+      g.gain.exponentialRampToValueAtTime(0.001, start + tail);
+      src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(masterGain);
+      const w = ac.createGain(); w.gain.value = 0.65; g.connect(w); w.connect(reverb);
+      src.start(start); src.stop(start + tail);
+    }
+
+    for (const r of profile.rumbles) {
+      const tail = r[5] > 0 ? dur * r[5] : Math.max(2.2, dur + r[5]);
+      rumble(r[0], r[1], r[2], r[3], r[4], tail);
+    }
+    for (const b of profile.bodies) {
+      const tail = b[4] > 0 ? Math.min(b[4], dur) : Math.max(2.4, dur + b[4]);
+      rollingBody(b[0], b[1], b[2], b[3], tail);
+    }
+
+    const sub = ac.createOscillator(); sub.type = 'sine';
+    sub.frequency.setValueAtTime(profile.sub[0], t0);
+    sub.frequency.exponentialRampToValueAtTime(profile.sub[1], t0 + profile.sub[3] * 0.88);
+    const subG = ac.createGain();
+    subG.gain.setValueAtTime(0, t0);
+    subG.gain.linearRampToValueAtTime(profile.sub[2], t0 + 0.18);
+    subG.gain.exponentialRampToValueAtTime(0.001, t0 + profile.sub[3]);
+    sub.connect(subG); subG.connect(masterGain);
+    sub.start(t0); sub.stop(t0 + profile.sub[3] + 0.2);
+  }
+  // Lightning is visual-only; the sound now comes from the deeper delayed
+  // thunder rumble so flashes do not create a sharp whip/crack.
+  function lightningCrack() {
+    return;
   }
   function dice() {
     if (!ac || muted) return;
@@ -5479,9 +5569,9 @@ const AUDIO = (() => {
     _matchTier = round || 0;
     if (!ac) return;
     // Tables: rain density, wind howl, shanty volume (lower in late rounds).
-    const rainTable   = [0.02975, 0.02975, 0.0425, 0.068, 0.0935, 0.119];
+    const rainTable   = [0.045, 0.045, 0.064, 0.102, 0.14, 0.178];
     const windTable   = [0.05, 0.05, 0.08, 0.12, 0.18, 0.24];
-    const shantyTable = [0.16, 0.16, 0.14, 0.10, 0.06, 0.03];
+    const shantyTable = [0.20, 0.20, 0.14, 0.10, 0.06, 0.03];
     const r = Math.max(0, Math.min(5, _matchTier));
     if (rainGain)   rainGain.gain.linearRampToValueAtTime(rainTable[r], ac.currentTime + 0.6);
     if (windGain)   windGain.gain.linearRampToValueAtTime(windTable[r], ac.currentTime + 0.6);
@@ -5670,12 +5760,25 @@ const AUDIO = (() => {
     });
   }
   return {
-    init, thunder, lightningCrack, dice, blip, fanfare, slam, heartbeat,
+    init, resume, thunder, lightningCrack, dice, blip, fanfare, slam, heartbeat,
     winSting, loseSting, wail, tableThump, setMuted, get muted(){return muted;},
     typewriter, coinClink, oceanSwell, triumphFanfare, soulTake, davyLaugh,
     setMatchTier,
   };
 })();
+
+// Mobile browsers require a trusted user gesture to start or resume Web Audio,
+// and they may suspend the context when the tab/app is backgrounded.
+function unlockAudio() {
+  if (!AUDIO || AUDIO.muted) return;
+  AUDIO.init();
+  if (AUDIO.resume) AUDIO.resume();
+}
+['pointerdown', 'touchstart', 'click'].forEach(type => {
+  document.addEventListener(type, unlockAudio, { passive: true, capture: true });
+});
+window.addEventListener('focus', unlockAudio);
+window.addEventListener('pageshow', unlockAudio);
 
 //----------------------------------------------------------------
 // DICE / CUP rendering
@@ -6515,6 +6618,7 @@ function scheduleAfterNextPaint(fn, delay=0) {
 
 function playLiarRevealAudio() {
   if (typeof AUDIO === 'undefined') return;
+  AUDIO.init();
   // Heavy SFX create oscillator/noise buffers. Queue them just after the
   // reveal frame is committed so the LIAR visual does not hitch on tap/click.
   scheduleAfterNextPaint(() => {
@@ -8815,6 +8919,7 @@ function leaveOnline() {
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
+  unlockAudio();
   if (state.netMode === 'host') {
     try { NET.reconnectBroker(); } catch (e) {}
     try { broadcastState(); broadcastLobby(); } catch (e) {}
@@ -10746,6 +10851,8 @@ const MOBILE = (() => {
     const fsBtn = document.getElementById('mob-fs-btn');
     if (fsBtn) {
       fsBtn.addEventListener('click', () => {
+        unlockAudio();
+        AUDIO.blip(660, 0.05);
         vibrate(15);
         FS.toggle();
       });
