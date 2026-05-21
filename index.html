@@ -3,12 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Liars Dice - Save Your Soul Or Lose It</title>
+<meta name="description" content="A haunted pirate tavern dice game. Bluff your crew, call the liars, and save your soul - or lose it.">
+<link rel="canonical" href="https://jhorner-maker.github.io/liarsdicetest21/">
+
+<!-- Mobile / PWA identity -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Liar's Dice">
+<meta name="apple-mobile-web-app-title" content="Liars Dice">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0a0604">
-<title>Liar's Dice — Dead Man's Chest</title>
+<meta name="application-name" content="Liars Dice">
+<meta name="theme-color" content="#07100a">
+<link rel="manifest" href="/liarsdicetest21/site.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="/liarsdicetest21/assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/liarsdicetest21/assets/liars-dice-icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/liarsdicetest21/assets/liars-dice-icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/liarsdicetest21/assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/liarsdicetest21/assets/favicon-16.png">
+
+<!-- Link previews for iMessage, Discord, Facebook, Slack, X/Twitter, etc. -->
+<meta property="og:site_name" content="Liars Dice">
+<meta property="og:title" content="Liars Dice">
+<meta property="og:description" content="Save Your Soul - Or Lose It. Bluff your crew, call the liars, and survive the haunted table.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jhorner-maker.github.io/liarsdicetest21/">
+<meta property="og:image" content="https://jhorner-maker.github.io/liarsdicetest21/assets/og-liars-dice.png">
+<meta property="og:image:secure_url" content="https://jhorner-maker.github.io/liarsdicetest21/assets/og-liars-dice.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:image:alt" content="A haunted ivory die glowing green inside an old brass pirate coin.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Liars Dice">
+<meta name="twitter:description" content="Save Your Soul - Or Lose It.">
+<meta name="twitter:image" content="https://jhorner-maker.github.io/liarsdicetest21/assets/og-liars-dice.png">
+<meta name="twitter:image:alt" content="A haunted ivory die glowing green inside an old brass pirate coin.">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -16,6 +45,8 @@
     width: 100%; height: 100%; background: #000; overflow: hidden;
     font-family: 'Press Start 2P', monospace; color: #e8d8a8;
     user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
   #app {
     width: 100vw; height: 100vh;
@@ -1121,6 +1152,19 @@
       linear-gradient(to bottom, #050302 0%, #090503 52%, #020101 100%);
     /* Honor iOS notch / home indicator. viewport-fit=cover (in <meta>) lets us extend behind them. */
     padding-bottom: env(safe-area-inset-bottom);
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  body.in-game #mobile-view button,
+  body.in-game #mobile-view canvas,
+  body.in-game #mobile-view .mob-stepper,
+  body.in-game #mobile-view .mob-action-row {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .mob-header {
@@ -1425,6 +1469,10 @@
       inset 0 0 28px rgba(0,0,0,0.45);
     position: relative;
   }
+  .mob-controls.is-waiting .mob-bid-row,
+  .mob-controls.is-waiting .mob-action-row {
+    visibility: hidden;
+  }
   .mob-bid-row {
     display: flex; align-items: center; justify-content: center;
     gap: 5px;
@@ -1498,15 +1546,27 @@
   .mob-action-row .mob-liar-btn:disabled { background: #1a1004; color: #6a5030; border-color: #4a3010; opacity: 0.5; cursor: not-allowed; }
   /* Waiting-turn message — replaces the action row when it's not your turn */
   .mob-waiting-msg {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 7px;
+    z-index: 2;
+    min-height: 78px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    padding: 12px 10px;
+    padding: 8px 10px;
     color: #c89860;
     font-size: 10px;
     letter-spacing: 2px;
     background: rgba(26,16,4,0.6);
     border: 2px dashed #4a3010;
     line-height: 1.6;
+    pointer-events: none;
   }
+  .mob-waiting-msg[hidden] { display: none; }
   .mob-waiting-msg .who { color: #f4d27a; font-size: 13px; }
   /* Hand-dice roll-in animation */
   .mob-hand-dice canvas { animation: mobDieIn 0.4s ease-out backwards; }
@@ -6318,6 +6378,27 @@ function updateControls() {
   }
   syncStepper();
 }
+
+function isMobilePortraitGameplay() {
+  return document.body.classList.contains('in-game') &&
+    window.matchMedia('(max-width: 800px) and (orientation: portrait), (max-width: 500px)').matches;
+}
+
+function applyBidFeedback(face) {
+  const mobilePortrait = isMobilePortraitGameplay();
+  if (!mobilePortrait) {
+    state.screenShake = Math.max(state.screenShake, 0.25);
+  } else if (state.screenShake < 0.12) {
+    // Normal bid turns should not move the whole mobile camera. The bid card,
+    // particles, and audio carry the turn feedback; LIAR/reveal shakes remain.
+    state.screenShake = 0;
+  }
+  state.flashColor = mobilePortrait
+    ? { r: 255, g: 220, b: 120, a: 0.08, t: 0.18 }
+    : { r: 255, g: 220, b: 120, a: 0.15, t: 0.25 };
+  state.crewReact = Math.max(state.crewReact, mobilePortrait ? 0.25 : 0.4);
+}
+
 function placeBid(qty, face) {
   if (state.bid && !isHigherBid({qty,face}, state.bid)) {
     showToast('BID MUST BE HIGHER!');
@@ -6328,9 +6409,7 @@ function placeBid(qty, face) {
   if (!p.isAI) state.humanRevealed = false;
   logEvent(`${p.name}: "${qty}× ${face}${face===1?' (ones)':''}"`, 'bid');
   AUDIO.fanfare(face);
-  state.screenShake = Math.max(state.screenShake, 0.25);
-  state.flashColor = { r: 255, g: 220, b: 120, a: 0.15, t: 0.25 };
-  state.crewReact = Math.max(state.crewReact, 0.4);
+  applyBidFeedback(face);
   const seat = p.seat || { x: SCENE.W/2, y: 100 };
   state.effects.push({
     type: 'bidCard', qty, face, name: p.name,
@@ -8323,9 +8402,7 @@ function applyRemoteState(data) {
       const bidder = state.players[state.bid.by];
       if (bidder) {
         if (typeof AUDIO !== 'undefined' && AUDIO.fanfare) AUDIO.fanfare(state.bid.face);
-        state.screenShake = Math.max(state.screenShake, 0.25);
-        state.flashColor = { r: 255, g: 220, b: 120, a: 0.15, t: 0.25 };
-        state.crewReact = Math.max(state.crewReact, 0.4);
+        applyBidFeedback(state.bid.face);
         const seat = bidder.seat || { x: SCENE.W/2, y: 100 };
         state.effects.push({
           type: 'bidCard', qty: state.bid.qty, face: state.bid.face, name: bidder.name,
@@ -10302,7 +10379,9 @@ const MOBILE = (() => {
     const myLiarBtn = document.getElementById('mob-liar-btn');
     myBidBtn.disabled = desktopBid.disabled;
     myLiarBtn.disabled = desktopLiar.disabled;
-    // When it's not your turn, replace the action row with a clear waiting message
+    // When it's not your turn, overlay a clear waiting message while preserving
+    // the bid/action row footprint. This keeps the flexed canvas from resizing
+    // and prevents the whole mobile scene from bumping between turns.
     const cur = currentPlayer();
     const isMyTurn = cur && state.phase === 'bidding' &&
       ((cur.peerId && cur.peerId === NET.myId) || (state.netMode === 'offline' && !cur.isAI));
@@ -10319,10 +10398,13 @@ const MOBILE = (() => {
       }
       const turnTag = cur.isAI ? `${cur.name}<br><span style="font-size:9px;color:#8a6840;">(${cur.ai ? cur.ai.trait : 'AI'} thinking...)</span>` : cur.name;
       wait.innerHTML = `WAITING FOR <span class="who">${turnTag}</span>`;
-      bidRow.style.display = 'none';
-      actionRow.style.display = 'none';
+      wait.hidden = false;
+      controls.classList.add('is-waiting');
+      bidRow.style.display = '';
+      actionRow.style.display = '';
     } else {
-      if (wait) wait.remove();
+      if (wait) wait.hidden = true;
+      if (controls) controls.classList.remove('is-waiting');
       bidRow.style.display = '';
       actionRow.style.display = '';
     }
@@ -10346,7 +10428,45 @@ const MOBILE = (() => {
   function vibrate(pattern) {
     try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
   }
+
+  function installMobileZoomGuard() {
+    if (installMobileZoomGuard.installed) return;
+    installMobileZoomGuard.installed = true;
+    let lastTapAt = 0;
+
+    const shouldGuard = (e) => {
+      const target = e.target;
+      return document.body.classList.contains('in-game') &&
+        isMobilePortrait() &&
+        target &&
+        target.closest &&
+        target.closest('#mobile-view');
+    };
+
+    document.addEventListener('touchend', (e) => {
+      if (!shouldGuard(e) || e.changedTouches.length !== 1) return;
+      const now = Date.now();
+      const button = e.target.closest('button');
+      const isRapidSecondTap = now - lastTapAt < 360;
+      lastTapAt = now;
+      if (!isRapidSecondTap || !button) return;
+      e.preventDefault();
+      // iOS double-tap zoom prevention can swallow the second click. Replay it
+      // for buttons so fast bid/face stepping still feels responsive.
+      if (!button.disabled) button.click();
+    }, { passive: false, capture: true });
+
+    const blockGestureZoom = (e) => {
+      if (!shouldGuard(e)) return;
+      e.preventDefault();
+    };
+    document.addEventListener('gesturestart', blockGestureZoom, { passive: false });
+    document.addEventListener('gesturechange', blockGestureZoom, { passive: false });
+    document.addEventListener('gestureend', blockGestureZoom, { passive: false });
+  }
+
   function wireButtons() {
+    installMobileZoomGuard();
     // Stepper buttons — gentle tick haptic
     const stepperMap = [
       ['mob-qty-down', 'qty-down'],
