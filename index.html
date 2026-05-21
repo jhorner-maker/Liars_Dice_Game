@@ -3297,7 +3297,12 @@ const SCENE = (() => {
   rebuildRain();
   const splashes = [];
   let krakenT = 0, lightningT = 0, lightningNext = 4 + Math.random()*8, elapsed = 0;
+  let liarStorm = null;
   function flash() { lightningT = 0.6; return true; }
+  function flashLiarStorm(variant='deepSeaGreen') {
+    liarStorm = { variant, t: 0, life: 2.9, seed: Math.random()*1000 };
+    return true;
+  }
 
   // Layout constants for the play scene. LAYOUT.* gives positions/regions
   // expressed as functions of current W, H so portrait switching just works.
@@ -3352,6 +3357,146 @@ const SCENE = (() => {
 
   const TABLE = { cx: W/2, cy: 175, rx: 175, ry: 50 };
   recomputeLayout();
+
+  function getWindowPanes(skyEnd) {
+    const barW = 3;
+    const sillH = 8;
+    const topH = 4;
+    const paneH = Math.max(1, skyEnd - sillH - topH);
+    const quarter = W / 4;
+    const panes = [];
+    for (let i = 0; i < 4; i++) {
+      const leftBar = i === 0 ? 0 : barW;
+      const rightBar = i === 3 ? 0 : barW;
+      panes.push({
+        x: Math.round(i * quarter + leftBar),
+        y: topH,
+        w: Math.max(1, Math.round(quarter - leftBar - rightBar)),
+        h: paneH,
+      });
+    }
+    return panes;
+  }
+
+  function drawPaneBolt(pane, opts={}) {
+    const x = pane.x + pane.w * (opts.x ?? 0.5);
+    let y = pane.y - 6;
+    const endY = pane.y + pane.h * (opts.end ?? 0.82);
+    let drift = opts.drift ?? 0;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(pane.x, pane.y, pane.w, pane.h);
+    ctx.clip();
+    ctx.strokeStyle = opts.green ? '#c8ffd0' : '#f8ffff';
+    ctx.lineWidth = Math.max(1, opts.width || 2);
+    ctx.shadowColor = opts.green ? '#60ff80' : '#d8ffff';
+    ctx.shadowBlur = opts.green ? 11 : 9;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let step = 0; y < endY; step++) {
+      y += 8 + (step % 2) * 3;
+      drift += Math.sin((step + opts.phase) * 1.7) * 7 + (step % 2 ? -4 : 4);
+      ctx.lineTo(x + drift, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.88)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawLiarWindowStorm(dt, skyEnd) {
+    if (!liarStorm) return;
+    liarStorm.t += dt;
+    if (liarStorm.t >= liarStorm.life) { liarStorm = null; return; }
+
+    const t = liarStorm.t;
+    const burstA = Math.max(0, 1 - Math.abs(t - 0.10) / 0.15);
+    const burstB = Math.max(0, 1 - Math.abs(t - 0.34) / 0.20);
+    const afterGlow = Math.max(0, 1 - Math.max(0, t - 0.22) / 2.25);
+    const pulse = Math.max(burstA, burstB * 0.92);
+    const panes = getWindowPanes(skyEnd);
+    const haze = Math.max(pulse, afterGlow * 0.68);
+
+    // Soft exterior bloom: this reads as mist/light pouring through the window bank,
+    // not discrete green orbs. Frames still draw over it a few lines below.
+    if (haze > 0.02) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const bloom = ctx.createLinearGradient(0, 0, 0, skyEnd);
+      bloom.addColorStop(0, `rgba(245,255,245,${0.18*pulse})`);
+      bloom.addColorStop(0.44, `rgba(190,255,205,${0.18*haze})`);
+      bloom.addColorStop(0.74, `rgba(78,255,112,${0.15*haze})`);
+      bloom.addColorStop(1, 'rgba(78,255,112,0)');
+      ctx.fillStyle = bloom;
+      ctx.fillRect(0, 0, W, skyEnd);
+      ctx.fillStyle = `rgba(210,255,205,${0.07*haze})`;
+      for (let k = 0; k < 5; k++) {
+        const y = Math.round(skyEnd * (0.34 + k*0.095 + Math.sin(elapsed*0.8 + k)*0.012));
+        ctx.fillRect(0, y, W, Math.max(1, Math.round(skyEnd * 0.045)));
+      }
+      ctx.restore();
+    }
+
+    for (let i = 0; i < panes.length; i++) {
+      const pane = panes[i];
+      const isCenter = i === 1 || i === 2;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(pane.x, pane.y, pane.w, pane.h);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'lighter';
+
+      if (haze > 0.02) {
+        const whiteA = isCenter ? 0.74 : 0.42;
+        const greenA = isCenter ? 0.58 : 0.38;
+        const wash = ctx.createLinearGradient(0, pane.y, 0, pane.y + pane.h);
+        wash.addColorStop(0, `rgba(255,255,248,${whiteA*pulse})`);
+        wash.addColorStop(0.28, `rgba(225,255,214,${greenA*haze})`);
+        wash.addColorStop(0.62, `rgba(120,255,145,${0.34*haze})`);
+        wash.addColorStop(1, `rgba(35,255,88,${0.10*haze})`);
+        ctx.fillStyle = wash;
+        ctx.fillRect(pane.x, pane.y, pane.w, pane.h);
+
+        // Layered green-white mist bands. These replace the old visible circles.
+        for (let k = 0; k < 6; k++) {
+          const bandY = pane.y + pane.h * (0.34 + k*0.09 + Math.sin(elapsed*1.4 + i*0.8 + k)*0.018);
+          const bandH = Math.max(2, pane.h * (0.045 + k*0.006));
+          const band = ctx.createLinearGradient(pane.x, 0, pane.x + pane.w, 0);
+          band.addColorStop(0, 'rgba(80,255,120,0)');
+          band.addColorStop(0.22, `rgba(125,255,145,${0.10*haze})`);
+          band.addColorStop(0.5, `rgba(240,255,220,${0.18*haze})`);
+          band.addColorStop(0.78, `rgba(125,255,145,${0.10*haze})`);
+          band.addColorStop(1, 'rgba(80,255,120,0)');
+          ctx.fillStyle = band;
+          ctx.fillRect(pane.x - 2, bandY, pane.w + 4, bandH);
+        }
+
+        // Broad diagonal shafts create the "holy light through storm glass" feel.
+        for (let k = 0; k < 3; k++) {
+          const shaftX = pane.x + pane.w * (0.12 + k*0.34 + Math.sin(elapsed*0.9 + k + i)*0.025);
+          const shaft = ctx.createLinearGradient(shaftX - pane.w*0.20, 0, shaftX + pane.w*0.24, 0);
+          shaft.addColorStop(0, 'rgba(255,255,230,0)');
+          shaft.addColorStop(0.5, `rgba(235,255,215,${(0.10 + k*0.025)*haze})`);
+          shaft.addColorStop(1, 'rgba(120,255,145,0)');
+          ctx.fillStyle = shaft;
+          ctx.fillRect(shaftX - pane.w*0.22, pane.y, pane.w*0.44, pane.h);
+        }
+      }
+
+      ctx.restore();
+    }
+
+    if (burstA > 0.02) {
+      drawPaneBolt(panes[2], { x: 0.42, width: 3.0, green: true, phase: 2, end: 0.94 });
+      drawPaneBolt(panes[1], { x: 0.78, width: 1.8, green: true, phase: 5, end: 0.70 });
+    }
+    if (burstB > 0.02) {
+      drawPaneBolt(panes[3], { x: 0.34, width: 2.2, green: true, phase: 7, end: 0.82 });
+      drawPaneBolt(panes[0], { x: 0.66, width: 1.5, green: false, phase: 11, end: 0.68 });
+    }
+  }
 
   function drawWindow(dt) {
     elapsed += dt;
@@ -3411,6 +3556,8 @@ const SCENE = (() => {
         ctx.fillRect(baseX + sway - w/2, 18 + y, w, 1);
       }
     }
+    // LIAR Option 6: exterior deep-sea lightning, clipped behind individual window panes.
+    drawLiarWindowStorm(dt, skyEnd);
     // Lightning flash inside the window slit
     if (lightningT > 0) {
       ctx.fillStyle = `rgba(180,200,255,${lightningT*0.55})`;
@@ -4823,7 +4970,7 @@ const SCENE = (() => {
     ctx,
     get W() { return W; },
     get H() { return H; },
-    drawScene, drawTitle, flash, TABLE, setOrientation, setSize, LAYOUT: () => LAYOUT,
+    drawScene, drawTitle, flash, flashLiarStorm, TABLE, setOrientation, setSize, LAYOUT: () => LAYOUT,
     setGauntletAtmosphere, getGauntletRound,
   };
 })();
@@ -5849,21 +5996,21 @@ function assignSeatsPortraitGrid(all, T) {
       slot(T.cx + Math.round(T.rx * 0.33), TOP_Y + 5, 5.55, 'top', 'above', 'rear', 0.55, T.cx + Math.round(T.rx * 0.23), cupYTop),
     ],
     3: [
+      slot(frontL, FRONT_SIDE_Y, 5.22, 'front-left', 'below', 'shoulder', 0.45, T.cx - Math.round(T.rx * 0.28), cupYFront),
       slot(T.cx - Math.round(T.rx * 0.33), TOP_Y + 7, 5.42, 'top', 'above', 'rear', 0.51, T.cx - Math.round(T.rx * 0.23), cupYTop),
       slot(T.cx + Math.round(T.rx * 0.33), TOP_Y + 7, 5.42, 'top', 'above', 'rear', 0.51, T.cx + Math.round(T.rx * 0.23), cupYTop),
-      slot(frontL, FRONT_SIDE_Y, 5.22, 'front-left', 'below', 'shoulder', 0.45, T.cx - Math.round(T.rx * 0.28), cupYFront),
     ],
     4: [
+      slot(cornerL, SHOULDER_Y - 3, 5.08, 'left', 'below', 'shoulder', 0.43, T.cx - Math.round(T.rx * 0.46), cupYShoulder),
       slot(T.cx - Math.round(T.rx * 0.30), TOP_Y + 5, 5.43, 'top', 'above', 'rear', 0.51, T.cx - Math.round(T.rx * 0.21), cupYTop),
       slot(T.cx + Math.round(T.rx * 0.30), TOP_Y + 5, 5.43, 'top', 'above', 'rear', 0.51, T.cx + Math.round(T.rx * 0.21), cupYTop),
-      slot(cornerL, SHOULDER_Y - 3, 5.08, 'left', 'below', 'shoulder', 0.43, T.cx - Math.round(T.rx * 0.46), cupYShoulder),
       slot(cornerR, SHOULDER_Y - 3, 5.08, 'right', 'below', 'shoulder', 0.43, T.cx + Math.round(T.rx * 0.46), cupYShoulder),
     ],
     5: [
+      slot(shoulderL, SHOULDER_Y - 4, 4.95, 'left', 'below', 'shoulder', 0.40, T.cx - Math.round(T.rx * 0.48), cupYShoulder),
       slot(T.cx - Math.round(T.rx * 0.67), TOP_Y + 14, 4.82, 'top-left', 'above', 'rear', 0.45, T.cx - Math.round(T.rx * 0.36), cupYTop + 4),
       slot(T.cx, TOP_HIGH_Y + 4, 5.28, 'top', 'above', 'rear', 0.49, T.cx, cupYTopHigh),
       slot(T.cx + Math.round(T.rx * 0.67), TOP_Y + 14, 4.82, 'top-right', 'above', 'rear', 0.45, T.cx + Math.round(T.rx * 0.36), cupYTop + 4),
-      slot(shoulderL, SHOULDER_Y - 4, 4.95, 'left', 'below', 'shoulder', 0.40, T.cx - Math.round(T.rx * 0.48), cupYShoulder),
       slot(shoulderR, SHOULDER_Y - 4, 4.95, 'right', 'below', 'shoulder', 0.40, T.cx + Math.round(T.rx * 0.48), cupYShoulder),
     ],
   };
@@ -5894,6 +6041,7 @@ function assignSeatsPortraitGrid(all, T) {
       x, y, angle,
       side: isFront ? 'front' : 'back',
       scale: seatSlot.scale,
+      anchor: seatSlot.anchor,
       cupScale: cs,
       cupCenterX, cupCenterY,
       cupX: Math.round(cupCenterX - cupHalfW),
@@ -5902,6 +6050,41 @@ function assignSeatsPortraitGrid(all, T) {
       drawLayer: isFront ? 'front' : seatSlot.drawLayer,
     };
   }
+}
+
+function getClockwiseSeatAudit(players=state.players) {
+  const T = SCENE.TABLE;
+  const online = (state.netMode === 'host' || state.netMode === 'client');
+  const localIdx = online
+    ? Math.max(0, players.findIndex(p => p.peerId && p.peerId === NET.myId))
+    : 0;
+  const ordered = online
+    ? players.slice(localIdx).concat(players.slice(0, localIdx))
+    : players;
+  const live = ordered.filter(p => p && p.seat);
+  const base = Math.PI / 2;
+  function clockwiseRank(seat) {
+    let a = Math.atan2(seat.y - T.cy, seat.x - T.cx);
+    while (a < base) a += Math.PI * 2;
+    return a - base;
+  }
+  const start = live.length ? clockwiseRank(live[0].seat) : 0;
+  const rows = live.map((p, i) => {
+    const rank = clockwiseRank(p.seat);
+    return {
+      index: i,
+      turnIndex: players.indexOf(p),
+      id: p.id,
+      name: p.name,
+      anchor: p.seat.anchor || '',
+      drawLayer: p.seat.drawLayer || '',
+      x: p.seat.x,
+      y: p.seat.y,
+      clockwiseDelta: Number((((rank - start) + Math.PI * 2) % (Math.PI * 2)).toFixed(3)),
+    };
+  });
+  const isClockwise = rows.every((row, i) => i === 0 || row.clockwiseDelta >= rows[i - 1].clockwiseDelta - 0.001);
+  return { count: rows.length, isClockwise, rows };
 }
 
 //----------------------------------------------------------------
@@ -5983,6 +6166,104 @@ function nextTurn(skipAdvance) {
     if (humanCount >= 2) showCurtain(p);
   }
 }
+
+function buildRevealScatter(dicePerPlayer, revealFace) {
+  const T = SCENE.TABLE;
+  const innerRx = Math.max(34, T.rx - 8);
+  const innerRy = Math.max(24, T.ry - 8);
+  const scatter = [];
+  const totalDice = state.players.reduce((sum, p) => {
+    if (!p.alive || !p.seat) return sum;
+    const dice = dicePerPlayer[p.id] || p.dice || [];
+    return sum + dice.length;
+  }, 0);
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const maxRadius = totalDice <= 10 ? 0.90 : (totalDice <= 20 ? 0.95 : 0.985);
+  const minGap = SCENE.H > SCENE.W ? 23 : 18;
+
+  function targetForOrdinal(n, attempt=0) {
+    // Center-out sunflower dispersion: starts near center, then fills the table evenly.
+    const idx = n + 0.36 + attempt * 0.18;
+    let radius = Math.sqrt(idx / Math.max(1, totalDice)) * maxRadius;
+    let angle = n * golden - Math.PI / 2 + attempt * golden;
+    if (attempt > 0) radius = Math.min(maxRadius, Math.max(0.08, radius + ((attempt % 5) - 2) * 0.035));
+
+    let tx = T.cx + Math.cos(angle) * innerRx * radius;
+    let ty = T.cy + Math.sin(angle) * innerRy * radius;
+
+    // Keep the very bottom/right visual area lighter so the spread stays table-centered.
+    if (tx > T.cx + innerRx * 0.32 && ty > T.cy + innerRy * 0.30) {
+      tx -= innerRx * 0.22;
+      ty -= innerRy * 0.12;
+    }
+
+    const dx = (tx - T.cx) / innerRx;
+    const dy = (ty - T.cy) / innerRy;
+    if (dx*dx + dy*dy > 0.94) {
+      tx = T.cx + (tx - T.cx) * 0.92;
+      ty = T.cy + (ty - T.cy) * 0.92;
+    }
+    return { tx, ty };
+  }
+
+  let ordinal = 0;
+
+  for (const p of state.players) {
+    if (!p.alive || !p.seat) continue;
+    const dice = dicePerPlayer[p.id] || p.dice || [];
+    const cupCenterX = p.seat.cupCenterX != null ? p.seat.cupCenterX : p.seat.cupX + 15;
+    const cupCenterY = p.seat.cupCenterY != null ? p.seat.cupCenterY : p.seat.cupY + 13;
+    const playerIdx = state.players.indexOf(p);
+
+    for (let di = 0; di < dice.length; di++, ordinal++) {
+      const face = dice[di];
+      const isMatch = (face === revealFace) || (revealFace !== 1 && face === 1);
+      let tx = T.cx, ty = T.cy;
+
+      let best = null;
+      let bestNearest = -1;
+      for (let tries = 0; tries < 28; tries++) {
+        const target = targetForOrdinal(ordinal, tries);
+        let nearest = Infinity;
+        for (const s of scatter) nearest = Math.min(nearest, Math.hypot(s.toX - target.tx, s.toY - target.ty));
+        if (!scatter.length) nearest = minGap;
+        if (nearest > bestNearest) {
+          bestNearest = nearest;
+          best = target;
+        }
+        let ok = true;
+        for (const s of scatter) {
+          if (Math.hypot(s.toX - target.tx, s.toY - target.ty) < minGap) { ok = false; break; }
+        }
+        if (ok) {
+          best = target;
+          break;
+        }
+      }
+      if (best) {
+        tx = best.tx;
+        ty = best.ty;
+      }
+
+      scatter.push({
+        playerId: p.id,
+        dieIdx: di,
+        face,
+        isMatch,
+        fromX: cupCenterX,
+        fromY: cupCenterY,
+        toX: tx,
+        toY: ty,
+        rot: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random()-0.5) * 12,
+        launchT: 0.45 + playerIdx*0.07 + di*0.05,
+        flightDur: 0.55 + Math.random()*0.15,
+      });
+    }
+  }
+  return scatter;
+}
+
 function showCurtain(player) {
   state.humanRevealed = false;
   const c = document.getElementById('curtain');
@@ -6068,19 +6349,43 @@ function placeBid(qty, face) {
   nextTurn();
   return true;
 }
+
+function scheduleAfterNextPaint(fn, delay=0) {
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      try { fn(); } catch(e) {}
+    }, delay);
+  });
+}
+
+function playLiarRevealAudio() {
+  if (typeof AUDIO === 'undefined') return;
+  // Heavy SFX create oscillator/noise buffers. Queue them just after the
+  // reveal frame is committed so the LIAR visual does not hitch on tap/click.
+  scheduleAfterNextPaint(() => {
+    AUDIO.slam();
+    AUDIO.heartbeat();
+    AUDIO.tableThump();
+    if (AUDIO.lightningCrack) AUDIO.lightningCrack();
+  });
+  scheduleAfterNextPaint(() => { if (AUDIO.lightningCrack) AUDIO.lightningCrack(); }, 220);
+  scheduleAfterNextPaint(() => { if (AUDIO.thunder) AUDIO.thunder(); }, 520);
+  scheduleAfterNextPaint(() => AUDIO.heartbeat(), 1100);
+  scheduleAfterNextPaint(() => AUDIO.dice(), 70);
+  scheduleAfterNextPaint(() => AUDIO.dice(), 320);
+  scheduleAfterNextPaint(() => AUDIO.dice(), 570);
+}
+
 function callLiar() {
   if (!state.bid) return;
   const caller = currentPlayer();
   if (!caller.isAI) state.humanRevealed = false;
   const bidder = state.players[state.bid.by];
   logEvent(`${caller.name}: "LIAR!"`, 'liar');
-  AUDIO.slam(); AUDIO.heartbeat();
-  setTimeout(() => AUDIO.heartbeat(), 1100);
   state.effects.push({ type: 'liarSlam', name: caller.name, t: 0, life: 2.4 });
   state.effects.push({ type: 'liarPortrait', sprite: caller.sprite, name: caller.name, t: 0, life: 2.4 });
   const cs = caller.seat || { x: SCENE.W/2, y: 165 };
   state.effects.push({ type: 'shockwave', fromX: SCENE.TABLE.cx, fromY: SCENE.TABLE.cy, t: 0, life: 0.9 });
-  AUDIO.tableThump();
   for (let i = 0; i < 18; i++) {
     state.particles.push({
       x: cs.x + (Math.random()-0.5)*8, y: cs.y - 8,
@@ -6091,14 +6396,12 @@ function callLiar() {
   }
   state.screenShake = 1.4;
   state.boatRock = 1.0;
-  state.flashColor = { r: 240, g: 60, b: 30, a: 0.40, t: 0.6 };
+  state.flashColor = { r: 240, g: 60, b: 30, a: 0.22, t: 0.42 };
   state.crewGasp = 1.0; state.crewReact = 1.0;
-  SCENE.flash();
-  setTimeout(() => SCENE.flash(), 220);
-  // Layered electric crackles to match the double-flash drama of a LIAR call
-  if (typeof AUDIO !== 'undefined') {
-    AUDIO.lightningCrack();
-    setTimeout(() => AUDIO.lightningCrack(), 220);
+  if (SCENE.flashLiarStorm) SCENE.flashLiarStorm('deepSeaGreen');
+  else {
+    SCENE.flash();
+    setTimeout(() => SCENE.flash(), 220);
   }
   state.phase = 'reveal';
   const dicePerPlayer = {};
@@ -6113,53 +6416,8 @@ function callLiar() {
       GAUNTLET.recordBluffOutcome(bidder, state.bid, actual);
     }
   } catch(e){}
-  // Build scatter trajectory for every die — they'll fly from each player's
-  // cup onto the table center in arcing parabolas, then settle.
-  const scatter = [];
-  const T = SCENE.TABLE;
-  const innerRx = T.rx - 28;
-  const innerRy = T.ry - 18;
-  for (const p of state.players) {
-    if (!p.alive) continue;
-    const cupCenterX = p.seat.cupCenterX != null ? p.seat.cupCenterX : p.seat.cupX + 15;
-    const cupCenterY = p.seat.cupCenterY != null ? p.seat.cupCenterY : p.seat.cupY + 13;
-    for (let di = 0; di < p.dice.length; di++) {
-      const face = p.dice[di];
-      const isMatch = (face === state.bid.face) ||
-                      (state.bid.face !== 1 && face === 1);
-      // Random target inside the inner table ellipse
-      let tx, ty;
-      for (let tries = 0; tries < 8; tries++) {
-        const r = Math.sqrt(Math.random());
-        const ang = Math.random() * Math.PI * 2;
-        tx = T.cx + Math.cos(ang) * innerRx * r;
-        ty = T.cy + Math.sin(ang) * innerRy * r;
-        // Avoid overlapping previously placed dice
-        let ok = true;
-        for (const s of scatter) {
-          if (Math.hypot(s.toX - tx, s.toY - ty) < 16) { ok = false; break; }
-        }
-        if (ok) break;
-      }
-      // Stagger launch by player + die index so the spill cascades
-      const playerIdx = state.players.indexOf(p);
-      const launchT = 0.45 + playerIdx*0.07 + di*0.05;
-      scatter.push({
-        playerId: p.id,
-        dieIdx: di,
-        face,
-        isMatch,
-        fromX: cupCenterX,
-        fromY: cupCenterY,
-        toX: tx,
-        toY: ty,
-        rot: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random()-0.5) * 12,
-        launchT,
-        flightDur: 0.55 + Math.random()*0.15,
-      });
-    }
-  }
+  // Build scatter trajectory for every die: centered table-wide spread, not a bottom-right clump.
+  const scatter = buildRevealScatter(dicePerPlayer, state.bid.face);
   state.reveal = {
     dicePerPlayer, t: 0, claimed, actual,
     face: state.bid.face,
@@ -6169,11 +6427,9 @@ function callLiar() {
     countDisplay: 0, // animates up to `actual`
   };
   logEvent(formatRevealLogEntry(state.reveal), 'liar');
-  AUDIO.dice();
-  setTimeout(() => AUDIO.dice(), 250);
-  setTimeout(() => AUDIO.dice(), 500);
   updateBanner();
   updateControls();
+  playLiarRevealAudio();
   setTimeout(() => resolveLiar(), 4200);
 }
 function resolveLiar() {
@@ -6406,6 +6662,11 @@ function drawPlayers(dt) {
   for (const p of rearRow) drawPlayer(p, p.seat.scale != null ? p.seat.scale : 3);
   // 2. Rear and side cups (sit on the table before near characters draw)
   for (const p of cupRow) drawCupFor(p);
+  // During reveal, front cups are also tipped onto the table, but they must sit behind
+  // the close-camera characters instead of clipping across their faces/bodies.
+  if (state.phase === 'reveal') {
+    for (const p of frontRow) drawCupFor(p);
+  }
 
   // 3. During reveal — scattered dice on the table (drawn over the table, under the central panel)
   if (state.phase === 'reveal' && state.reveal) drawScatteredDice();
@@ -6416,8 +6677,6 @@ function drawPlayers(dt) {
   // 5. Shoulder + front sprites — drawn after the table panel so they sit closest to camera
   for (const p of shoulderRow) drawPlayer(p, p.seat.scale != null ? p.seat.scale : 3);
   for (const p of frontRow) drawPlayer(p, p.seat.scale != null ? p.seat.scale : 3);
-  // 6. Front cup
-  for (const p of frontRow) drawCupFor(p);
 
   // 7. Front player's open dice — rendered as DOM in the HUD (#hand-display) so it can never be hidden by the bidding controls.
   syncHandDisplay(revealPlayer && state.phase !== 'reveal' ? revealPlayer : null);
@@ -6454,10 +6713,10 @@ function drawPlayers(dt) {
       const pulse = 0.5 + Math.sin((t - highlightStart) * 6) * 0.5;
       if (isHighlighting) {
         const glowColor = r.truth ? 'rgba(120, 240, 120,' : 'rgba(255, 200, 80,';
-        ctx.fillStyle = glowColor + (0.5 * pulse) + ')';
-        ctx.fillRect(x - 5, y - 5, 22, 22);
-        ctx.fillStyle = glowColor + (0.85 * pulse) + ')';
-        ctx.fillRect(x - 2, y - 2, 16, 16);
+        ctx.fillStyle = glowColor + (0.42 * pulse) + ')';
+        ctx.fillRect(x - 3, y - 3, 18, 18);
+        ctx.fillStyle = glowColor + (0.78 * pulse) + ')';
+        ctx.fillRect(x - 1, y - 1, 14, 14);
       }
       // Draw the die — spin while airborne by slight x-jitter (no real rotation in pixel art)
       const wobble = settled ? 0 : Math.sin((t + s.rot) * 24) * 1;
@@ -6490,7 +6749,11 @@ function drawPlayers(dt) {
     if (state.phase === 'reveal' && state.reveal) {
       // Reveal panel sits ABOVE the table so it doesn't cover the scattered dice.
       const r = state.reveal;
-      const cx = T.cx, cy = 86; // up near the wall
+      const portrait = SCENE.H > SCENE.W;
+      const cx = T.cx;
+      const cy = portrait
+        ? Math.min(T.cy - T.ry - 20, Math.max(126, Math.round(SCENE.H * 0.285)))
+        : 90;
       const w = 220, h = 44;
       // Animated border color
       const showVerdict = r.t >= 3.0;
@@ -6783,7 +7046,8 @@ function drawEffects(dt) {
       const u = Math.min(1, e.t / 0.25);
       const ease = 1 - Math.pow(1-u, 4);
       const fade = e.t > e.life - 0.5 ? Math.max(0, (e.life - e.t)/0.5) : 1;
-      const yBase = -40 + (110 + 40) * ease;
+      const targetY = SCENE.H > SCENE.W ? Math.max(66, Math.round(SCENE.H * 0.145)) : 112;
+      const yBase = -40 + (targetY + 40) * ease;
       ctx.globalAlpha = fade;
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
       ctx.fillRect(0, yBase - 16, SCENE.W, 32);
@@ -7203,11 +7467,33 @@ const NET = (() => {
   let peer = null;
   let myId = null;
   let isHost = false;
+  let intentionallyLeaving = false;
+  let keepAliveTimer = null;
   const connections = new Map(); // peerId -> DataConnection
   const handlers = {};
   const peerHandlers = { join: [], leave: [] };
 
   function log(...args) { try { console.log('[NET]', ...args); } catch (e) {} }
+
+  function startKeepAlive() {
+    if (keepAliveTimer) return;
+    keepAliveTimer = setInterval(() => {
+      for (const [peerId, c] of connections.entries()) {
+        if (!c || !c.open) continue;
+        try { c.send({ type: 'ping', payload: { t: Date.now() } }); }
+        catch (e) {
+          log('keepalive failed for', peerId, e && e.message);
+          try { c.close(); } catch (_) {}
+        }
+      }
+    }, 15000);
+  }
+
+  function stopKeepAlive() {
+    if (!keepAliveTimer) return;
+    clearInterval(keepAliveTimer);
+    keepAliveTimer = null;
+  }
 
   async function load() {
     if (lib) return lib;
@@ -7221,6 +7507,7 @@ const NET = (() => {
   async function host(roomCode) {
     const mod = await load();
     const Peer = mod.default || mod.Peer;
+    intentionallyLeaving = false;
     isHost = true;
     const targetId = PEER_PREFIX + roomCode;
     return new Promise((resolve, reject) => {
@@ -7230,6 +7517,7 @@ const NET = (() => {
       peer.on('open', id => {
         myId = id;
         resolved = true;
+        startKeepAlive();
         log('host opened with id', id);
         resolve({ myId, roomCode });
       });
@@ -7242,6 +7530,7 @@ const NET = (() => {
         wireConnection(conn);
       });
       peer.on('disconnected', () => {
+        if (intentionallyLeaving) return;
         log('host disconnected from broker — attempting reconnect');
         try { peer.reconnect(); } catch (e) {}
       });
@@ -7253,6 +7542,7 @@ const NET = (() => {
   async function join(roomCode) {
     const mod = await load();
     const Peer = mod.default || mod.Peer;
+    intentionallyLeaving = false;
     isHost = false;
     const targetId = PEER_PREFIX + roomCode;
     return new Promise((resolve, reject) => {
@@ -7261,6 +7551,7 @@ const NET = (() => {
       let resolved = false;
       peer.on('open', id => {
         myId = id;
+        startKeepAlive();
         log('client opened with id', id, '— connecting to host', targetId);
         const conn = peer.connect(targetId, { reliable: true, serialization: 'json' });
         const tConn = setTimeout(() => {
@@ -7311,21 +7602,30 @@ const NET = (() => {
     const msg = { type: name, payload };
     if (peerId) {
       const c = connections.get(peerId);
-      if (c && c.open) c.send(msg);
-      else log('send: no open connection for', peerId);
+      if (c && c.open) {
+        try { c.send(msg); return true; }
+        catch (e) { log('send failed for', peerId, e && e.message); return false; }
+      }
+      log('send: no open connection for', peerId);
+      return false;
     } else {
       // Broadcast to all open connections
       let n = 0;
       for (const c of connections.values()) {
-        if (c.open) { c.send(msg); n++; }
+        if (!c.open) continue;
+        try { c.send(msg); n++; }
+        catch (e) { log('broadcast send failed', e && e.message); }
       }
-      if (!n) log('send: no peers to broadcast to (action=' + name + ')');
+      if (!n && name !== 'lobby' && name !== 'ping') log('send: no peers to broadcast to (action=' + name + ')');
+      return n > 0;
     }
   }
   function on(name, fn) { handlers[name] = fn; }
   function onPeerJoin(fn) { peerHandlers.join.push(fn); }
   function onPeerLeave(fn) { peerHandlers.leave.push(fn); }
   function leave() {
+    intentionallyLeaving = true;
+    stopKeepAlive();
     for (const c of connections.values()) { try { c.close(); } catch (e) {} }
     connections.clear();
     if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
@@ -7932,7 +8232,9 @@ function applyRemoteState(data) {
     // (2) Liar called: phase just entered 'reveal'.
     if (state.phase === 'reveal' && prevPhase !== 'reveal' && state.reveal) {
       const r = state.reveal;
-      if (typeof AUDIO !== 'undefined') {
+      if (typeof playLiarRevealAudio === 'function') {
+        playLiarRevealAudio();
+      } else if (typeof AUDIO !== 'undefined') {
         if (AUDIO.slam) AUDIO.slam();
         if (AUDIO.heartbeat) { AUDIO.heartbeat(); setTimeout(() => AUDIO.heartbeat(), 1100); }
         if (AUDIO.tableThump) AUDIO.tableThump();
@@ -7940,6 +8242,7 @@ function applyRemoteState(data) {
           AUDIO.lightningCrack();
           setTimeout(() => AUDIO.lightningCrack(), 220);
         }
+        if (AUDIO.thunder) setTimeout(() => AUDIO.thunder(), 360);
         if (AUDIO.dice) {
           AUDIO.dice();
           setTimeout(() => AUDIO.dice(), 250);
@@ -7955,12 +8258,16 @@ function applyRemoteState(data) {
       }
       state.screenShake = 1.4;
       state.boatRock = 1.0;
-      state.flashColor = { r: 240, g: 60, b: 30, a: 0.40, t: 0.6 };
+      state.flashColor = { r: 240, g: 60, b: 30, a: 0.22, t: 0.42 };
       state.crewGasp = 1.0;
       state.crewReact = 1.0;
-      if (typeof SCENE !== 'undefined' && SCENE.flash) {
-        SCENE.flash();
-        setTimeout(() => SCENE.flash(), 220);
+      if (typeof SCENE !== 'undefined') {
+        if (SCENE.flashLiarStorm) {
+          SCENE.flashLiarStorm('deepSeaGreen');
+        } else if (SCENE.flash) {
+          SCENE.flash();
+          setTimeout(() => SCENE.flash(), 220);
+        }
       }
       buildLocalRevealScatter(r);
       // Verdict toast — matches the host's resolveLiar timing. The host
@@ -8086,45 +8393,7 @@ function applyRemoteState(data) {
 // the now-revealed dicePerPlayer values rather than mutating state.
 function buildLocalRevealScatter(r) {
   if (!r || !r.dicePerPlayer) return;
-  const T = SCENE.TABLE;
-  const innerRx = T.rx - 28;
-  const innerRy = T.ry - 18;
-  const scatter = [];
-  let pIdx = 0;
-  for (const p of state.players) {
-    if (!p.alive || !p.seat) { pIdx++; continue; }
-    const dice = r.dicePerPlayer[p.id] || p.dice;
-    const cupCenterX = p.seat.cupCenterX != null ? p.seat.cupCenterX : p.seat.cupX + 15;
-    const cupCenterY = p.seat.cupCenterY != null ? p.seat.cupCenterY : p.seat.cupY + 13;
-    for (let di = 0; di < dice.length; di++) {
-      const face = dice[di];
-      const isMatch = (face === r.face) || (r.face !== 1 && face === 1);
-      let tx, ty;
-      for (let tries = 0; tries < 8; tries++) {
-        const rad = Math.sqrt(Math.random());
-        const ang = Math.random() * Math.PI * 2;
-        tx = T.cx + Math.cos(ang) * innerRx * rad;
-        ty = T.cy + Math.sin(ang) * innerRy * rad;
-        let ok = true;
-        for (const s of scatter) {
-          if (Math.hypot(s.toX - tx, s.toY - ty) < 16) { ok = false; break; }
-        }
-        if (ok) break;
-      }
-      const launchT = 0.45 + pIdx*0.07 + di*0.05;
-      scatter.push({
-        playerId: p.id, dieIdx: di, face, isMatch,
-        fromX: cupCenterX, fromY: cupCenterY,
-        toX: tx, toY: ty,
-        rot: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random()-0.5) * 12,
-        launchT,
-        flightDur: 0.55 + Math.random()*0.15,
-      });
-    }
-    pIdx++;
-  }
-  r.scatter = scatter;
+  r.scatter = buildRevealScatter(r.dicePerPlayer, r.face);
   r.countDisplay = 0;
 }
 
@@ -8149,7 +8418,12 @@ placeBid = function(qty, face) {
       showToast('BID MUST BE HIGHER!');
       return false;
     }
-    NET.send('action', { type: 'bid', qty, face });
+    const sent = NET.send('action', { type: 'bid', qty, face });
+    if (!sent) {
+      showToast('CONNECTION LOST — TRY REJOINING');
+      updateControls();
+      return false;
+    }
     // Lock both action buttons until the next state broadcast confirms
     // the move. Prevents accidental double-bid from a fast double-tap
     // and gives the user a visual cue that their click registered.
@@ -8167,7 +8441,12 @@ const _origCallLiar = callLiar;
 callLiar = function() {
   if (state.netMode === 'client') {
     if (!state.bid) return; // no bid to call; host would no-op anyway
-    NET.send('action', { type: 'liar' });
+    const sent = NET.send('action', { type: 'liar' });
+    if (!sent) {
+      showToast('CONNECTION LOST — TRY REJOINING');
+      updateControls();
+      return;
+    }
     try {
       const b = document.getElementById('btn-bid');
       const l = document.getElementById('btn-liar');
@@ -10099,7 +10378,7 @@ const MOBILE = (() => {
       if (liarBtn.disabled) return;
       vibrate([60, 30, 80]);
       document.getElementById('btn-liar').click();
-      renderControls();
+      requestAnimationFrame(renderControls);
     });
     document.getElementById('mob-audio-btn').addEventListener('click', () => {
       vibrate(15);
