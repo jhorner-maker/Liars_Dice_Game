@@ -5118,6 +5118,7 @@ const AUDIO = (() => {
   let ac = null, masterGain, musicGain, rainGain, windGain, ambientGain, sfxGain, reverb;
   let muted = false;
   let thunderVariant = 0;
+  let lastPrimeAt = 0;
   function init() {
     if (ac) { resume(); return; }
     ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -5130,7 +5131,7 @@ const AUDIO = (() => {
     musicGain = ac.createGain(); musicGain.gain.value = 0.20; musicGain.connect(masterGain);
     const musicWet = ac.createGain(); musicWet.gain.value = 0.08;
     musicGain.connect(musicWet); musicWet.connect(reverb);
-    rainGain = ac.createGain(); rainGain.gain.value = 0.045; rainGain.connect(masterGain);
+    rainGain = ac.createGain(); rainGain.gain.value = 0.03375; rainGain.connect(masterGain);
     windGain = ac.createGain(); windGain.gain.value = 0.05; windGain.connect(masterGain);
     ambientGain = ac.createGain(); ambientGain.gain.value = 0.5; ambientGain.connect(masterGain);
     sfxGain = ac.createGain(); sfxGain.gain.value = 0.85; sfxGain.connect(masterGain);
@@ -5140,6 +5141,21 @@ const AUDIO = (() => {
   function resume() {
     if (!ac || typeof ac.resume !== 'function' || ac.state === 'running') return;
     try { ac.resume(); } catch (e) {}
+  }
+  function prime() {
+    if (!ac || muted) return;
+    resume();
+    const now = Date.now();
+    if (now - lastPrimeAt < 250) return;
+    lastPrimeAt = now;
+    try {
+      const o = ac.createOscillator(); const g = ac.createGain();
+      o.type = 'sine'; o.frequency.value = 440;
+      g.gain.value = 0.0001;
+      o.connect(g); g.connect(masterGain);
+      o.start();
+      o.stop(ac.currentTime + 0.03);
+    } catch (e) {}
   }
   function makeReverbIR(d, decay) {
     const len = Math.floor(ac.sampleRate * d);
@@ -5451,7 +5467,7 @@ const AUDIO = (() => {
         lp.frequency.exponentialRampToValueAtTime(3200, start+0.05);
         lp.frequency.exponentialRampToValueAtTime(1200, start+0.4);
         const g = ac.createGain();
-        const peak = 0.18 * (type === 'square' ? 0.6 : 1);
+        const peak = 0.135 * (type === 'square' ? 0.6 : 1);
         g.gain.setValueAtTime(0,start);
         g.gain.linearRampToValueAtTime(peak, start+0.025);
         g.gain.exponentialRampToValueAtTime(0.001, start+0.42);
@@ -5569,7 +5585,7 @@ const AUDIO = (() => {
     _matchTier = round || 0;
     if (!ac) return;
     // Tables: rain density, wind howl, shanty volume (lower in late rounds).
-    const rainTable   = [0.045, 0.045, 0.064, 0.102, 0.14, 0.178];
+    const rainTable   = [0.03375, 0.03375, 0.048, 0.0765, 0.105, 0.1335];
     const windTable   = [0.05, 0.05, 0.08, 0.12, 0.18, 0.24];
     const shantyTable = [0.20, 0.20, 0.14, 0.10, 0.06, 0.03];
     const r = Math.max(0, Math.min(5, _matchTier));
@@ -5760,7 +5776,7 @@ const AUDIO = (() => {
     });
   }
   return {
-    init, resume, thunder, lightningCrack, dice, blip, fanfare, slam, heartbeat,
+    init, resume, prime, thunder, lightningCrack, dice, blip, fanfare, slam, heartbeat,
     winSting, loseSting, wail, tableThump, setMuted, get muted(){return muted;},
     typewriter, coinClink, oceanSwell, triumphFanfare, soulTake, davyLaugh,
     setMatchTier,
@@ -5773,8 +5789,9 @@ function unlockAudio() {
   if (!AUDIO || AUDIO.muted) return;
   AUDIO.init();
   if (AUDIO.resume) AUDIO.resume();
+  if (AUDIO.prime) AUDIO.prime();
 }
-['pointerdown', 'touchstart', 'click'].forEach(type => {
+['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'].forEach(type => {
   document.addEventListener(type, unlockAudio, { passive: true, capture: true });
 });
 window.addEventListener('focus', unlockAudio);
@@ -7684,17 +7701,17 @@ function syncStepper() {
 }
 document.getElementById('qty-down').onclick = () => {
   const min = state.bid ? state.bid.qty : 1;
-  if (humanBid.qty > min) { humanBid.qty--; syncStepper(); AUDIO.blip(330,0.04); }
+  if (humanBid.qty > min) { humanBid.qty--; syncStepper(); AUDIO.blip(330,0.04,'square',0.135); }
 };
 document.getElementById('qty-up').onclick = () => {
   const max = state.totalDice();
-  if (humanBid.qty < max) { humanBid.qty++; syncStepper(); AUDIO.blip(440,0.04); }
+  if (humanBid.qty < max) { humanBid.qty++; syncStepper(); AUDIO.blip(440,0.04,'square',0.135); }
 };
 document.getElementById('face-down').onclick = () => {
-  if (humanBid.face > 1) { humanBid.face--; syncStepper(); AUDIO.blip(330,0.04); }
+  if (humanBid.face > 1) { humanBid.face--; syncStepper(); AUDIO.blip(330,0.04,'square',0.135); }
 };
 document.getElementById('face-up').onclick = () => {
-  if (humanBid.face < 6) { humanBid.face++; syncStepper(); AUDIO.blip(440,0.04); }
+  if (humanBid.face < 6) { humanBid.face++; syncStepper(); AUDIO.blip(440,0.04,'square',0.135); }
 };
 document.getElementById('btn-bid').onclick = () => {
   if (placeBid(humanBid.qty, humanBid.face)) {
