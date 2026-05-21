@@ -7317,7 +7317,7 @@ function setupMenu() {
     }
   };
   document.getElementById('humans-up').onclick = () => {
-    if (state.numHumans < 5) {
+    if (state.numHumans < 6) {
       state.numHumans++;
       document.getElementById('humans-val').textContent = state.numHumans;
       applyMode('multi'); AUDIO.blip(440, 0.04);
@@ -7547,6 +7547,8 @@ const NET = (() => {
   let isHost = false;
   let intentionallyLeaving = false;
   let keepAliveTimer = null;
+  let currentRoomCode = null;
+  let pendingHostReconnect = false;
   const connections = new Map(); // peerId -> DataConnection
   const handlers = {};
   const peerHandlers = { join: [], leave: [] };
@@ -7587,6 +7589,7 @@ const NET = (() => {
     const Peer = mod.default || mod.Peer;
     intentionallyLeaving = false;
     isHost = true;
+    currentRoomCode = roomCode;
     const targetId = PEER_PREFIX + roomCode;
     return new Promise((resolve, reject) => {
       try { peer = new Peer(targetId, { debug: 1 }); }
@@ -7622,6 +7625,7 @@ const NET = (() => {
     const Peer = mod.default || mod.Peer;
     intentionallyLeaving = false;
     isHost = false;
+    currentRoomCode = roomCode;
     const targetId = PEER_PREFIX + roomCode;
     return new Promise((resolve, reject) => {
       try { peer = new Peer({ debug: 1 }); }
@@ -7701,20 +7705,56 @@ const NET = (() => {
   function on(name, fn) { handlers[name] = fn; }
   function onPeerJoin(fn) { peerHandlers.join.push(fn); }
   function onPeerLeave(fn) { peerHandlers.leave.push(fn); }
+  function reconnectBroker() {
+    if (!peer || intentionallyLeaving) return false;
+    try {
+      if (peer.disconnected && !peer.destroyed) peer.reconnect();
+      return true;
+    } catch (e) {
+      log('broker reconnect failed', e && e.message);
+      return false;
+    }
+  }
+  function reconnectToHost() {
+    if (isHost || intentionallyLeaving || !currentRoomCode || !peer || peer.destroyed) return false;
+    const targetId = PEER_PREFIX + currentRoomCode;
+    if (connections.has(targetId)) return true;
+    if (pendingHostReconnect) return true;
+    pendingHostReconnect = true;
+    reconnectBroker();
+    try {
+      const conn = peer.connect(targetId, { reliable: true, serialization: 'json' });
+      conn.on('open', () => {
+        pendingHostReconnect = false;
+        log('client reconnected to host');
+        wireConnection(conn);
+      });
+      conn.on('error', err => {
+        pendingHostReconnect = false;
+        log('client reconnect error:', err && err.message);
+      });
+      conn.on('close', () => { pendingHostReconnect = false; });
+      return true;
+    } catch (e) {
+      pendingHostReconnect = false;
+      log('client reconnect failed:', e && e.message);
+      return false;
+    }
+  }
   function leave() {
     intentionallyLeaving = true;
     stopKeepAlive();
     for (const c of connections.values()) { try { c.close(); } catch (e) {} }
     connections.clear();
     if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
-    myId = null; isHost = false;
+    myId = null; isHost = false; currentRoomCode = null; pendingHostReconnect = false;
     handlers.hello = handlers.lobby = handlers.state = handlers.action = handlers.event = handlers.kick = null;
     peerHandlers.join.length = 0;
     peerHandlers.leave.length = 0;
   }
 
   return {
-    host, join, send, on, onPeerJoin, onPeerLeave, leave,
+    host, join, send, on, onPeerJoin, onPeerLeave, reconnectBroker, reconnectToHost, leave,
     get myId() { return myId; },
     get isHost() { return isHost; },
     get connected() { return !!peer; },
@@ -7736,7 +7776,50 @@ const ONLINE = {
   selectedAIs: new Set(), // host-only; AI ids to seat
   // Game-time:
   myPlayerId: null,       // assigned when game starts (matches state.players[i].id)
+  disconnectTimers: new Map(),
+  reconnectTimer: null,
+  reconnectInterval: null,
 };
+const ONLINE_RECONNECT_GRACE_MS = 45000;
+const ONLINE_RECONNECT_RETRY_MS = 3000;
+
+function clearPeerDisconnectTimer(peerId) {
+  const timer = ONLINE.disconnectTimers.get(peerId);
+  if (timer) clearTimeout(timer);
+  ONLINE.disconnectTimers.delete(peerId);
+  const info = ONLINE.players.get(peerId);
+  if (info) info.disconnected = false;
+}
+
+function clearClientReconnectGrace() {
+  if (ONLINE.reconnectTimer) clearTimeout(ONLINE.reconnectTimer);
+  if (ONLINE.reconnectInterval) clearInterval(ONLINE.reconnectInterval);
+  ONLINE.reconnectTimer = null;
+  ONLINE.reconnectInterval = null;
+  state.connectionPaused = false;
+  try { updateControls(); } catch (e) {}
+}
+
+function startClientReconnectGrace() {
+  if (ONLINE.reconnectTimer) return;
+  state.connectionPaused = true;
+  showToast('CONNECTION PAUSED — RECONNECTING...', 6);
+  try { updateControls(); } catch (e) {}
+  try { NET.reconnectToHost(); } catch (e) {}
+  ONLINE.reconnectInterval = setInterval(() => {
+    try { NET.reconnectToHost(); } catch (e) {}
+  }, ONLINE_RECONNECT_RETRY_MS);
+  ONLINE.reconnectTimer = setTimeout(() => {
+    clearClientReconnectGrace();
+    showToast('HOST DISCONNECTED — Returning to title...', 4);
+    if (state.reveal) state.reveal = null;
+    if (state.appPhase === 'game') {
+      state.phase = 'menu';
+      try { updateBanner(); updateControls(); } catch (e) {}
+    }
+    setTimeout(() => { try { leaveOnline(); } catch (e) {} }, 2200);
+  }, ONLINE_RECONNECT_GRACE_MS);
+}
 
 function generateRoomCode() {
   // Exclude ambiguous chars (0/O, I/1, etc.)
@@ -7834,6 +7917,7 @@ function renderLobbyPlayers() {
     const st = document.createElement('div');
     st.className = 'lobby-player-status';
     if (info.isHost) { st.textContent = 'HOST'; st.classList.add('host'); }
+    else if (info.disconnected) { st.textContent = 'RECONNECTING'; st.classList.add('waiting'); }
     else if (info.ready) { st.textContent = 'READY'; }
     else { st.textContent = 'PICKING'; st.classList.add('waiting'); }
     row.appendChild(st);
@@ -7908,19 +7992,47 @@ async function hostNewGame() {
   }
   // Wire host-side network handlers
   NET.onPeerJoin(peerId => {
-    // New peer: send them the current lobby snapshot
-    const snapshot = lobbySnapshot();
-    NET.send('lobby', snapshot, peerId);
+    clearPeerDisconnectTimer(peerId);
+    if (state.appPhase === 'game') {
+      const p = state.players.find(pl => pl.peerId === peerId);
+      if (p) {
+        showToast(`${p.name} RECONNECTED`, 2);
+        NET.send('state', viewForClient(peerId), peerId);
+        broadcastState();
+        return;
+      }
+    }
+    NET.send('lobby', lobbySnapshot(), peerId);
+    renderLobbyPlayers();
   });
   NET.onPeerLeave(peerId => {
     if (ONLINE.players.has(peerId)) {
-      ONLINE.players.delete(peerId);
-      broadcastLobby();
+      const info = ONLINE.players.get(peerId);
+      if (ONLINE.disconnectTimers.has(peerId)) return;
+      info.disconnected = true;
       renderLobbyPlayers();
-      // If game in progress, mark them out
+      if (state.appPhase === 'game') {
+        showToast(`${info.name} DISCONNECTED — HOLDING SEAT`, 4);
+        ONLINE.disconnectTimers.set(peerId, setTimeout(() => {
+          ONLINE.disconnectTimers.delete(peerId);
+          ONLINE.players.delete(peerId);
+          renderLobbyPlayers();
+          broadcastLobby();
+          const p = state.players.find(pl => pl.peerId === peerId);
+          if (p) { p.alive = false; p.dice = []; broadcastState(); }
+        }, ONLINE_RECONNECT_GRACE_MS));
+      } else {
+        ONLINE.disconnectTimers.set(peerId, setTimeout(() => {
+          ONLINE.disconnectTimers.delete(peerId);
+          ONLINE.players.delete(peerId);
+          broadcastLobby();
+          renderLobbyPlayers();
+        }, ONLINE_RECONNECT_GRACE_MS));
+        broadcastLobby();
+      }
       if (state.appPhase === 'game') {
         const p = state.players.find(pl => pl.peerId === peerId);
-        if (p) { p.alive = false; p.dice = []; broadcastState(); }
+        if (p) broadcastState();
       }
     }
   });
@@ -7960,6 +8072,17 @@ async function hostNewGame() {
     if (!p || p.peerId !== peerId) return;
     if (data.type === 'bid') tryHostBid(data.qty, data.face);
     else if (data.type === 'liar') tryHostLiar();
+  });
+  NET.on('leave', (data, peerId) => {
+    clearPeerDisconnectTimer(peerId);
+    if (!ONLINE.players.has(peerId)) return;
+    ONLINE.players.delete(peerId);
+    renderLobbyPlayers();
+    broadcastLobby();
+    if (state.appPhase === 'game') {
+      const p = state.players.find(pl => pl.peerId === peerId);
+      if (p) { p.alive = false; p.dice = []; broadcastState(); }
+    }
   });
 }
 
@@ -8019,6 +8142,7 @@ async function clientJoin(code) {
   // Wire client-side network handlers
   NET.on('lobby', (data) => {
     if (!data || !data.players) return;
+    clearClientReconnectGrace();
     ONLINE.players.clear();
     for (const p of data.players) {
       ONLINE.players.set(p.peerId, {
@@ -8033,6 +8157,7 @@ async function clientJoin(code) {
     setTimeout(() => leaveOnline(), 1500);
   });
   NET.on('state', (data) => {
+    clearClientReconnectGrace();
     applyRemoteState(data);
   });
   NET.on('event', (data) => {
@@ -8046,15 +8171,7 @@ async function clientJoin(code) {
   // event for a client means the host left.
   NET.onPeerLeave(() => {
     if (state.netMode !== 'client') return;
-    showToast('HOST DISCONNECTED — Returning to title...', 4);
-    // Hard-stop the reveal animation if mid-flight so the screen doesn't
-    // freeze on a stale frame while the toast plays out.
-    if (state.reveal) state.reveal = null;
-    if (state.appPhase === 'game') {
-      state.phase = 'menu';
-      try { updateBanner(); updateControls(); } catch (e) {}
-    }
-    setTimeout(() => { try { leaveOnline(); } catch (e) {} }, 2500);
+    startClientReconnectGrace();
   });
 }
 
@@ -8559,7 +8676,7 @@ updateControls = function() {
   _origUpdateControls();
   if (state.netMode === 'client' || state.netMode === 'host') {
     const cur = currentPlayer();
-    const myTurn = cur && cur.peerId === NET.myId && state.phase === 'bidding' && cur.alive;
+    const myTurn = !state.connectionPaused && cur && cur.peerId === NET.myId && state.phase === 'bidding' && cur.alive;
     document.getElementById('btn-bid').disabled = !myTurn;
     document.getElementById('btn-liar').disabled = !myTurn || !state.bid;
     // Hand display always shows the local player's hand
@@ -8576,6 +8693,12 @@ updateControls = function() {
 // LOBBY HOOKUP
 //----------------------------------------------------------------
 function leaveOnline() {
+  clearClientReconnectGrace();
+  for (const timer of ONLINE.disconnectTimers.values()) clearTimeout(timer);
+  ONLINE.disconnectTimers.clear();
+  if (state.netMode === 'client' || ONLINE.mode === 'client') {
+    try { NET.send('leave', { intentional: true }); } catch (e) {}
+  }
   NET.leave();
   ONLINE.mode = null;
   ONLINE.roomCode = null;
@@ -8586,6 +8709,16 @@ function leaveOnline() {
   resetForNewGame();
   showTitleScreen();
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (state.netMode === 'host') {
+    try { NET.reconnectBroker(); } catch (e) {}
+    try { broadcastState(); broadcastLobby(); } catch (e) {}
+  } else if (state.netMode === 'client') {
+    try { NET.reconnectToHost(); } catch (e) {}
+  }
+});
 
 document.getElementById('btn-host-online').onclick = () => { hostNewGame(); };
 document.getElementById('btn-join-online').onclick = () => { showOnlineJoin(); };
